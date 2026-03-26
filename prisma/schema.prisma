@@ -1,0 +1,583 @@
+// prisma/schema.prisma
+// WaizAI - Complete Database Schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── PLANS & SUBSCRIPTIONS ───────────────────────────────────
+model Plan {
+  id                  String   @id @default(uuid())
+  name                String   @unique
+  displayName         String
+  price               Int      // in paise (₹499 = 49900)
+  maxNumbers          Int      @default(1)
+  maxMessages         Int      @default(500)
+  maxAiCalls          Int      @default(100)
+  maxContacts         Int      @default(100)
+  storageGb           Float    @default(0.05)
+  maxCampaigns        Int      @default(1)
+  maxFollowups        Int      @default(1)
+  calendarEnabled     Boolean  @default(false)
+  channelsEnabled     Boolean  @default(true)
+  analyticsLevel      String   @default("basic") // basic | standard | advanced | full
+  minMsgGapSeconds    Int      @default(10)
+  buttonsEnabled      Boolean  @default(false)   // superadmin grants per-user
+  listsEnabled        Boolean  @default(false)
+  supportLevel        String   @default("ai")    // ai | email | priority | dedicated
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  tenants       Tenant[]
+  subscriptions Subscription[]
+}
+
+// ── TENANTS (CLIENTS) ────────────────────────────────────────
+model Tenant {
+  id                  String    @id @default(uuid())
+  email               String    @unique
+  password            String
+  ownerName           String
+  businessName        String
+  phone               String    @unique
+  planId              String?
+  plan                Plan?     @relation(fields: [planId], references: [id])
+  status              String    @default("active") // active | suspended | trial | deleted
+  emailVerified       Boolean   @default(false)
+  phoneVerified       Boolean   @default(false)
+  consentGiven        Boolean   @default(false)
+  consentAt           DateTime?
+  trialEndsAt         DateTime?
+  lastLoginAt         DateTime?
+  lastActiveAt        DateTime?
+  storageUsedMb       Float     @default(0)
+  messagesThisMonth   Int       @default(0)
+  aiCallsThisMonth    Int       @default(0)
+  msgResetAt          DateTime  @default(now())
+  // Superadmin granted permissions
+  buttonsEnabled      Boolean   @default(false)
+  listsEnabled        Boolean   @default(false)
+  // Theme
+  themeId             String    @default("dark-green")
+  // Affiliate
+  referredByAffiliateId String?
+  affiliate           Affiliate? @relation(fields: [referredByAffiliateId], references: [id])
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  numbers           TenantNumber[]
+  contacts          Contact[]
+  messages          Message[]
+  campaigns         Campaign[]
+  followupSequences FollowupSequence[]
+  aiConfig          AiConfig?
+  knowledgeDocs     KnowledgeDoc[]
+  calendarToken     CalendarToken?
+  appointments      Appointment[]
+  subscriptions     Subscription[]
+  apiUsage          ApiUsage[]
+  statusPosts       StatusPost[]
+  otps              Otp[]
+  refreshTokens     RefreshToken[]
+  supportTickets    SupportTicket[]
+  affiliateReferrals AffiliateReferral[]
+  sessions          UserSession[]
+
+  @@index([email])
+  @@index([phone])
+  @@index([status])
+}
+
+// ── WHATSAPP NUMBERS ─────────────────────────────────────────
+model TenantNumber {
+  id               String    @id @default(uuid())
+  tenantId         String
+  tenant           Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  phoneNumber      String
+  displayName      String?
+  sessionFilePath  String?
+  sessionStatus    String    @default("disconnected") // disconnected | connecting | connected | banned
+  qrCode           String?   @db.Text
+  lastConnectedAt  DateTime?
+  isDefault        Boolean   @default(false)
+  minMsgGapSec     Int       @default(5)
+  maxMsgGapSec     Int       @default(20)
+  readDelayMs      Int       @default(1000)
+  aiEnabled        Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  messages   Message[]
+  contacts   Contact[]
+  groups     WAGroup[]
+
+  @@unique([tenantId, phoneNumber])
+  @@index([tenantId])
+  @@index([sessionStatus])
+}
+
+// ── AI CONFIG (per tenant) ───────────────────────────────────
+model AiConfig {
+  id                  String   @id @default(uuid())
+  tenantId            String   @unique
+  tenant              Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  aiModel             String   @default("claude-sonnet-4-6")
+  tone                String   @default("friendly")
+  language            String   @default("match")
+  businessDescription String?  @db.Text
+  productsServices    String?  @db.Text
+  priceRange          String?
+  popularItems        String?  @db.Text
+  currentOffers       String?  @db.Text
+  brands              String?  @db.Text
+  usp                 String?  @db.Text
+  warrantyPolicy      String?  @db.Text
+  deliveryInfo        String?  @db.Text
+  paymentMethods      String[] @default([])
+  customInstructions  String?  @db.Text
+  avoidTopics         String?  @db.Text
+  escalationTriggers  String?  @db.Text
+  outOfHoursMsg       String?  @db.Text
+  maxResponseChars    Int      @default(200)
+  responseDelaySec    Int      @default(2)
+  autoReact           Boolean  @default(true)
+  replyInGroups       Boolean  @default(false)
+  sendTypingIndicator Boolean  @default(true)
+  mentionUsersInReply Boolean  @default(true)
+  businessHours       Json     @default("{}")
+  faqs                Json     @default("[]")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+// ── KNOWLEDGE DOCUMENTS ──────────────────────────────────────
+model KnowledgeDoc {
+  id            String   @id @default(uuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  filename      String
+  originalName  String
+  s3Key         String
+  s3Url         String
+  mimeType      String
+  sizeBytes     Int
+  extractedText String?  @db.Text
+  isIndexed     Boolean  @default(false)
+  indexedAt     DateTime?
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+// ── CONTACTS (CRM) ───────────────────────────────────────────
+model Contact {
+  id             String    @id @default(uuid())
+  tenantId       String
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  numberId       String?
+  number         TenantNumber? @relation(fields: [numberId], references: [id])
+  waJid          String    // WhatsApp JID (phone@s.whatsapp.net)
+  name           String?
+  phoneNumber    String
+  profilePicUrl  String?
+  waStatus       String?
+  label          String    @default("none") // none | lead | customer | vip | prospect
+  notes          String?   @db.Text
+  isBlocked      Boolean   @default(false)
+  isMuted        Boolean   @default(false)
+  aiEnabled      Boolean   @default(true)
+  lastMessageAt  DateTime?
+  messageCount   Int       @default(0)
+  tags           String[]  @default([])
+  customFields   Json      @default("{}")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  messages     Message[]
+  appointments Appointment[]
+  followupEnrollments FollowupEnrollment[]
+
+  @@unique([tenantId, waJid])
+  @@index([tenantId])
+  @@index([tenantId, label])
+}
+
+// ── MESSAGES ─────────────────────────────────────────────────
+model Message {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  numberId    String?
+  number      TenantNumber? @relation(fields: [numberId], references: [id])
+  contactId   String?
+  contact     Contact? @relation(fields: [contactId], references: [id])
+  waMessageId String?  @unique
+  fromJid     String
+  toJid       String
+  body        String?  @db.Text
+  type        String   @default("text") // text | image | audio | video | document | sticker | location | contact_card | poll | reaction | system
+  direction   String   // inbound | outbound
+  aiSent      Boolean  @default(false)
+  mediaUrl    String?
+  mediaKey    String?
+  mimetype    String?
+  filename    String?
+  latitude    Float?
+  longitude   Float?
+  locationName String?
+  quotedMsgId String?
+  reactionEmoji String?
+  isRead      Boolean  @default(false)
+  isDelivered Boolean  @default(false)
+  failReason  String?
+  metadata    Json     @default("{}")
+  timestamp   DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([tenantId, fromJid])
+  @@index([tenantId, toJid])
+  @@index([tenantId, timestamp])
+  @@index([contactId])
+}
+
+// ── CAMPAIGNS ────────────────────────────────────────────────
+model Campaign {
+  id             String    @id @default(uuid())
+  tenantId       String
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  message        String    @db.Text
+  mediaUrl       String?
+  mediaType      String?
+  targetType     String    @default("all") // all | label | custom
+  targetLabels   String[]  @default([])
+  targetJids     String[]  @default([])
+  status         String    @default("draft") // draft | scheduled | running | paused | completed | failed
+  scheduledAt    DateTime?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  sentCount      Int       @default(0)
+  deliveredCount Int       @default(0)
+  readCount      Int       @default(0)
+  replyCount     Int       @default(0)
+  failedCount    Int       @default(0)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+}
+
+// ── FOLLOWUP SEQUENCES ───────────────────────────────────────
+model FollowupSequence {
+  id            String   @id @default(uuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name          String
+  description   String?
+  triggerType   String   // no_reply | keyword | new_contact | label_change
+  triggerValue  String?  // keyword text or label name
+  delayValue    Int
+  delayUnit     String   @default("hours") // minutes | hours | days
+  message       String   @db.Text
+  stopOnReply   Boolean  @default(true)
+  isActive      Boolean  @default(true)
+  sentCount     Int      @default(0)
+  replyCount    Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  enrollments FollowupEnrollment[]
+
+  @@index([tenantId])
+  @@index([tenantId, isActive])
+}
+
+model FollowupEnrollment {
+  id            String    @id @default(uuid())
+  sequenceId    String
+  sequence      FollowupSequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  contactId     String
+  contact       Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  tenantId      String
+  status        String    @default("pending") // pending | sent | cancelled | replied
+  scheduledAt   DateTime
+  sentAt        DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@unique([sequenceId, contactId])
+  @@index([tenantId])
+  @@index([scheduledAt, status])
+}
+
+// ── GROUPS ───────────────────────────────────────────────────
+model WAGroup {
+  id             String   @id @default(uuid())
+  tenantId       String
+  numberId       String
+  number         TenantNumber @relation(fields: [numberId], references: [id], onDelete: Cascade)
+  groupJid       String
+  name           String
+  description    String?
+  inviteCode     String?
+  isAdmin        Boolean  @default(false)
+  memberCount    Int      @default(0)
+  membersJson    Json     @default("[]")
+  settingsJson   Json     @default("{}")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([numberId, groupJid])
+  @@index([tenantId])
+}
+
+// ── GOOGLE CALENDAR ──────────────────────────────────────────
+model CalendarToken {
+  id              String    @id @default(uuid())
+  tenantId        String    @unique
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  accessToken     String    @db.Text
+  refreshToken    String    @db.Text
+  expiresAt       DateTime
+  email           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Appointment {
+  id               String    @id @default(uuid())
+  tenantId         String
+  tenant           Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contactId        String?
+  contact          Contact?  @relation(fields: [contactId], references: [id])
+  title            String
+  description      String?
+  startTime        DateTime
+  endTime          DateTime
+  calendarEventId  String?
+  status           String    @default("confirmed") // confirmed | pending | cancelled | rescheduled
+  createdViaAi     Boolean   @default(false)
+  reminderSent     Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([tenantId, startTime])
+}
+
+// ── SUBSCRIPTIONS ────────────────────────────────────────────
+model Subscription {
+  id                 String    @id @default(uuid())
+  tenantId           String
+  tenant             Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  planId             String
+  plan               Plan      @relation(fields: [planId], references: [id])
+  status             String    @default("active") // active | cancelled | expired | past_due
+  startDate          DateTime  @default(now())
+  endDate            DateTime?
+  razorpaySubId      String?
+  razorpayOrderId    String?
+  razorpayPaymentId  String?
+  amount             Int
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([status])
+}
+
+// ── STATUS POSTS ─────────────────────────────────────────────
+model StatusPost {
+  id          String    @id @default(uuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  body        String    @db.Text
+  mediaUrl    String?
+  mediaType   String?
+  status      String    @default("draft") // draft | published | scheduled
+  scheduledAt DateTime?
+  publishedAt DateTime?
+  viewCount   Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  @@index([tenantId])
+}
+
+// ── API USAGE TRACKING ───────────────────────────────────────
+model ApiUsage {
+  id            String   @id @default(uuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  provider      String   // anthropic | openai | deepseek | sarvam
+  model         String
+  inputTokens   Int      @default(0)
+  outputTokens  Int      @default(0)
+  costUsd       Float    @default(0)
+  endpoint      String?
+  timestamp     DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([timestamp])
+  @@index([provider])
+}
+
+// ── OTP ──────────────────────────────────────────────────────
+model Otp {
+  id         String   @id @default(uuid())
+  tenantId   String?
+  tenant     Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  identifier String   // email or phone
+  type       String   // email | sms
+  code       String
+  purpose    String   // registration | login | reset_password
+  attempts   Int      @default(0)
+  verified   Boolean  @default(false)
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([identifier])
+  @@index([expiresAt])
+}
+
+// ── REFRESH TOKENS ────────────────────────────────────────────
+model RefreshToken {
+  id         String   @id @default(uuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  token      String   @unique
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([token])
+  @@index([tenantId])
+}
+
+// ── USER SESSIONS (LOGIN) ─────────────────────────────────────
+model UserSession {
+  id         String   @id @default(uuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+// ── SUPPORT TICKETS ───────────────────────────────────────────
+model SupportTicket {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subject     String
+  body        String   @db.Text
+  status      String   @default("open") // open | in_progress | resolved | closed
+  priority    String   @default("normal")
+  resolvedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([status])
+}
+
+// ── SUPERADMIN ────────────────────────────────────────────────
+model SuperAdmin {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  password      String
+  name          String
+  isActive      Boolean  @default(true)
+  lastLoginAt   DateTime?
+  createdAt     DateTime @default(now())
+
+  actions AdminAction[]
+}
+
+model AdminAction {
+  id          String     @id @default(uuid())
+  adminId     String
+  admin       SuperAdmin @relation(fields: [adminId], references: [id])
+  actionType  String     // login_as_user | suspend_user | change_plan | update_api_key | payout_approved
+  targetType  String?    // tenant | affiliate | plan
+  targetId    String?
+  metadata    Json       @default("{}")
+  ipAddress   String?
+  createdAt   DateTime   @default(now())
+
+  @@index([adminId])
+  @@index([createdAt])
+}
+
+// ── AFFILIATES ────────────────────────────────────────────────
+model Affiliate {
+  id               String   @id @default(uuid())
+  name             String
+  email            String   @unique
+  password         String
+  phone            String?
+  code             String   @unique
+  commissionRate   Float    @default(0.20) // 20%
+  status           String   @default("active") // active | suspended
+  totalEarned      Int      @default(0) // in paise
+  totalPaid        Int      @default(0)
+  pendingPayout    Int      @default(0)
+  lastLoginAt      DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  referrals     AffiliateReferral[]
+  payouts       AffiliatePayout[]
+  tenants       Tenant[]
+
+  @@index([code])
+}
+
+model AffiliateReferral {
+  id               String     @id @default(uuid())
+  affiliateId      String
+  affiliate        Affiliate  @relation(fields: [affiliateId], references: [id])
+  tenantId         String
+  tenant           Tenant     @relation(fields: [tenantId], references: [id])
+  signedUpAt       DateTime   @default(now())
+  plan             String?
+  planPrice        Int        @default(0)
+  isActive         Boolean    @default(true)
+  commissionAmount Int        @default(0)
+  isPaid           Boolean    @default(false)
+  lastCalculatedAt DateTime?
+
+  @@unique([affiliateId, tenantId])
+  @@index([affiliateId])
+}
+
+model AffiliatePayout {
+  id           String    @id @default(uuid())
+  affiliateId  String
+  affiliate    Affiliate @relation(fields: [affiliateId], references: [id])
+  amount       Int       // in paise
+  method       String?   // bank | upi
+  reference    String?
+  status       String    @default("pending") // pending | processing | paid | failed
+  requestedAt  DateTime  @default(now())
+  processedAt  DateTime?
+  note         String?
+
+  @@index([affiliateId])
+  @@index([status])
+}
+
+// ── GLOBAL SETTINGS (superadmin configures) ───────────────────
+model GlobalSetting {
+  key       String @id
+  value     String @db.Text
+  updatedAt DateTime @updatedAt
+}
