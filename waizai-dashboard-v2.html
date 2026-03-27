@@ -1,0 +1,1662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>WaizAI — Business Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&family=Open+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080C10;--surface:#0F1923;--surface2:#162030;--surface3:#1C2B3A;--surface4:#223345;
+  --border:#1A2D40;--border2:#243D55;--border3:#2E4F6A;
+  --accent:#00E676;--accent-dim:#00C45A;--accent-dark:#007A3D;
+  --accent-glow:rgba(0,230,118,0.10);--accent-glow2:rgba(0,230,118,0.18);
+  --cyan:#00BCD4;--orange:#FF8F00;--red:#FF4F4F;--purple:#9C6FFF;--pink:#FF6BCB;
+  --text:#D8E8F5;--text2:#7A95B0;--text3:#3D5570;--text4:#263A50;
+  --sidebar-w:252px;--header-h:58px;
+  --r:10px;--rs:6px;--rl:14px;
+  --fh:'Nunito',sans-serif;--fb:'Open Sans',sans-serif;
+  --shadow:0 4px 24px rgba(0,0,0,0.4);
+}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);font-size:13.5px;display:flex}
+
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+/* ═══ SIDEBAR */
+#sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;overflow-y:auto;overflow-x:hidden;position:relative;z-index:20}
+.logo-wrap{padding:16px 14px 13px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0}
+.logo-mark{width:34px;height:34px;background:var(--accent);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;box-shadow:0 0 14px rgba(0,230,118,0.35)}
+.logo-name{font-family:var(--fh);font-size:18px;font-weight:900;color:#fff;letter-spacing:-0.3px}
+.logo-tag{font-size:9px;background:var(--accent);color:#000;font-weight:800;padding:1px 5px;border-radius:3px;margin-left:3px;vertical-align:middle}
+
+/* ═══ NUMBER SWITCHER */
+.num-switcher{margin:10px 10px 6px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.ns-header{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;cursor:pointer;transition:.2s;user-select:none}
+.ns-header:hover{background:var(--surface3)}
+.ns-left{display:flex;align-items:center;gap:8px}
+.ns-pulse{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent);flex-shrink:0;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.ns-num{font-size:12px;font-weight:700;color:var(--text);font-family:var(--fh)}
+.ns-label{font-size:10px;color:var(--text2);margin-top:1px}
+.ns-chevron{font-size:11px;color:var(--text3);transition:transform .2s}
+.ns-chevron.open{transform:rotate(180deg)}
+.ns-dropdown{display:none;border-top:1px solid var(--border)}
+.ns-dropdown.open{display:block}
+.ns-option{display:flex;align-items:center;gap:9px;padding:9px 12px;cursor:pointer;transition:.15s;border-bottom:1px solid var(--border)}
+.ns-option:last-child{border-bottom:none}
+.ns-option:hover{background:var(--surface3)}
+.ns-option.active{background:var(--accent-glow)}
+.ns-opt-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.ns-opt-dot.green{background:var(--accent);box-shadow:0 0 6px var(--accent)}
+.ns-opt-dot.gray{background:var(--text3)}
+.ns-opt-name{font-size:12px;font-weight:600;color:var(--text)}
+.ns-opt-sub{font-size:10px;color:var(--text3)}
+.ns-opt-badge{margin-left:auto;font-size:9px;padding:1px 6px;border-radius:3px;font-weight:700}
+.ns-opt-badge.all{background:rgba(0,188,212,.15);color:var(--cyan)}
+.ns-opt-badge.active-b{background:rgba(0,230,118,.12);color:var(--accent)}
+
+.biz-card{margin:6px 10px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;cursor:pointer;transition:border-color .2s}
+.biz-card:hover{border-color:var(--border2)}
+.biz-top{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.biz-av{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#1a3a5c,#091e30);border:2px solid var(--accent-dark);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.biz-name{font-family:var(--fh);font-size:12px;font-weight:800;color:var(--text);line-height:1.2}
+.biz-plan{font-size:10px;color:var(--accent);font-weight:600;margin-top:1px}
+
+.nav-section{padding:5px 10px 2px;flex-shrink:0}
+.nav-group-label{font-size:9.5px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:1.2px;padding:0 6px;margin-bottom:2px;font-family:var(--fh)}
+.nav-item{display:flex;align-items:center;gap:9px;padding:8px 8px;border-radius:var(--rs);cursor:pointer;color:var(--text2);font-size:13px;font-weight:500;margin:1px 0;transition:all .15s;position:relative;user-select:none;font-family:var(--fb)}
+.nav-item:hover{background:var(--surface2);color:var(--text)}
+.nav-item.active{background:var(--accent-glow);color:var(--accent);font-weight:700}
+.nav-item.active::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:55%;background:var(--accent);border-radius:0 2px 2px 0}
+.nav-ic{font-size:15px;width:20px;text-align:center;flex-shrink:0}
+.nav-badge{margin-left:auto;background:var(--red);color:#fff;font-size:9px;font-weight:700;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 4px}
+.nav-badge.green{background:var(--accent);color:#000}
+.nav-badge.soon{background:var(--surface3);color:var(--text3);font-size:8px}
+.nav-divider{height:1px;background:var(--border);margin:5px 10px}
+.sidebar-foot{margin-top:auto;padding:10px 10px;border-top:1px solid var(--border);flex-shrink:0}
+.sf-user{display:flex;align-items:center;gap:9px}
+.sf-av{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--accent-dim),var(--accent-dark));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#000;flex-shrink:0}
+.sf-name{font-size:12px;font-weight:700;color:var(--text);font-family:var(--fh)}
+.sf-role{font-size:10px;color:var(--text3)}
+
+/* ═══ MAIN */
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden;height:100vh}
+#topbar{height:var(--header-h);min-height:var(--header-h);background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:12px;flex-shrink:0}
+.tb-title{font-family:var(--fh);font-size:15px;font-weight:800;color:var(--text);white-space:nowrap}
+.tb-sub{font-size:11px;color:var(--text3);margin-left:1px;white-space:nowrap}
+.tb-spacer{flex:1}
+.tb-search{display:flex;align-items:center;gap:7px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--rs);padding:7px 11px;min-width:180px;transition:.2s}
+.tb-search:focus-within{border-color:var(--border2)}
+.tb-search input{background:none;border:none;outline:none;color:var(--text);font-size:12.5px;font-family:var(--fb);width:100%}
+.tb-search input::placeholder{color:var(--text3)}
+.tb-btn{display:flex;align-items:center;gap:6px;padding:7px 13px;border-radius:var(--rs);font-size:12px;font-weight:600;cursor:pointer;border:none;font-family:var(--fb);transition:opacity .15s;white-space:nowrap}
+.tb-btn.primary{background:var(--accent);color:#000}
+.tb-btn.primary:hover{opacity:.85}
+.tb-btn.ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+.tb-btn.ghost:hover{border-color:var(--border2)}
+.tb-avatar{width:30px;height:30px;border-radius:7px;background:linear-gradient(135deg,var(--accent-dim),var(--accent-dark));display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#000;cursor:pointer;flex-shrink:0}
+.tb-notif{position:relative;cursor:pointer;padding:4px;font-size:17px;color:var(--text2)}
+.tb-notif-dot{position:absolute;top:2px;right:2px;width:7px;height:7px;border-radius:50%;background:var(--red);border:1.5px solid var(--surface)}
+
+#content{flex:1;overflow-y:auto;overflow-x:hidden}
+.page{display:none;padding:22px 24px;animation:fadeIn .2s ease}
+.page.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+
+/* ═══ COMMON */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px 20px}
+.card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.card-title{font-family:var(--fh);font-size:13.5px;font-weight:800;color:var(--text);display:flex;align-items:center;gap:7px}
+.card-action{font-size:12px;color:var(--accent);cursor:pointer;font-weight:600}
+.section-title{font-family:var(--fh);font-size:18px;font-weight:900;color:var(--text);margin-bottom:4px}
+.section-sub{font-size:12.5px;color:var(--text2);margin-bottom:20px}
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:3px 7px;border-radius:4px}
+.badge.green{background:rgba(0,230,118,.12);color:var(--accent)}
+.badge.blue{background:rgba(0,188,212,.12);color:var(--cyan)}
+.badge.orange{background:rgba(255,143,0,.12);color:var(--orange)}
+.badge.red{background:rgba(255,79,79,.12);color:var(--red)}
+.badge.purple{background:rgba(156,111,255,.12);color:var(--purple)}
+.badge.gray{background:var(--surface3);color:var(--text3)}
+.pill-dot{width:5px;height:5px;border-radius:50%;background:currentColor}
+.form-group{margin-bottom:14px}
+.form-label{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--text2);font-weight:700;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px;font-family:var(--fh)}
+.form-label .lbl-badge{font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(255,143,0,.15);color:var(--orange);font-weight:700;text-transform:none;letter-spacing:0}
+.form-label .req{color:var(--red)}
+.form-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--rs);padding:9px 12px;color:var(--text);font-family:var(--fb);font-size:13px;outline:none;transition:.15s}
+.form-input:focus{border-color:var(--accent)}
+.form-input::placeholder{color:var(--text3)}
+textarea.form-input{resize:vertical;min-height:80px;line-height:1.5}
+select.form-input{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%233D5570' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:30px}
+select.form-input option{background:var(--surface2)}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border)}
+.toggle-row:last-child{border-bottom:none}
+.toggle-row-label{font-size:13px;font-weight:500;color:var(--text)}
+.toggle-row-sub{font-size:11px;color:var(--text3);margin-top:1px}
+.sw{position:relative;width:36px;height:20px;flex-shrink:0}
+.sw input{opacity:0;width:0;height:0}
+.sw-slider{position:absolute;inset:0;background:var(--surface3);border-radius:10px;transition:.2s;cursor:pointer;border:1px solid var(--border2)}
+.sw-slider::before{content:'';position:absolute;width:14px;height:14px;left:2px;top:2px;background:var(--text3);border-radius:50%;transition:.2s}
+.sw input:checked+.sw-slider{background:var(--accent);border-color:var(--accent)}
+.sw input:checked+.sw-slider::before{transform:translateX(16px);background:#000}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--rs);font-size:13px;font-weight:700;cursor:pointer;border:none;font-family:var(--fh);transition:all .15s}
+.btn-primary{background:var(--accent);color:#000}
+.btn-primary:hover{opacity:.85}
+.btn-ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+.btn-ghost:hover{border-color:var(--border2)}
+.btn-danger{background:rgba(255,79,79,.1);color:var(--red);border:1px solid rgba(255,79,79,.2)}
+.btn-danger:hover{background:rgba(255,79,79,.18)}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+.grid-4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:16px}
+
+/* ═══ OVERVIEW */
+.overview-welcome{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:22px;gap:16px;flex-wrap:wrap}
+.ow-text h2{font-family:var(--fh);font-size:22px;font-weight:900;color:var(--text);line-height:1.2}
+.ow-text p{font-size:13px;color:var(--text2);margin-top:4px}
+.ai-master-toggle{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 16px}
+.amt-label{font-size:12px;color:var(--text2);font-weight:500}
+.amt-status{font-size:12px;font-weight:700;color:var(--accent);font-family:var(--fh)}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px;transition:.2s;cursor:default}
+.kpi:hover{border-color:var(--border2);transform:translateY(-1px)}
+.kpi-icon{font-size:20px;margin-bottom:10px}
+.kpi-val{font-family:var(--fh);font-size:26px;font-weight:900;color:var(--text);line-height:1}
+.kpi-label{font-size:11.5px;color:var(--text2);margin-top:5px}
+.kpi-delta{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:700;margin-top:8px;padding:2px 7px;border-radius:4px}
+.kpi-delta.up{background:rgba(0,230,118,.1);color:var(--accent)}
+.kpi-delta.down{background:rgba(255,79,79,.1);color:var(--red)}
+.overview-mid{display:grid;grid-template-columns:1.5fr 1fr;gap:14px;margin-bottom:16px}
+.chart-bars{display:flex;align-items:flex-end;gap:5px;height:70px}
+.bar{flex:1;border-radius:3px 3px 0 0;background:var(--surface3);transition:.2s;cursor:pointer;min-height:4px}
+.bar:hover{background:var(--accent-dark)}
+.bar.hi{background:var(--accent-dim)}
+.chart-labels{display:flex;gap:5px;margin-top:5px}
+.chart-label{flex:1;text-align:center;font-size:10px;color:var(--text3)}
+.activity-item{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
+.activity-item:last-child{border-bottom:none}
+.act-dot{width:7px;height:7px;border-radius:50%;margin-top:4px;flex-shrink:0}
+.act-text{font-size:12.5px;color:var(--text);line-height:1.4;flex:1}
+.act-time{font-size:10.5px;color:var(--text3);margin-top:2px}
+.quick-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.quick-btn{background:var(--surface2);border:1px solid var(--border);border-radius:var(--rs);padding:12px;cursor:pointer;transition:.2s;text-align:left}
+.quick-btn:hover{border-color:var(--accent);background:var(--accent-glow)}
+.qb-icon{font-size:18px;margin-bottom:5px}
+.qb-title{font-size:12px;font-weight:700;color:var(--text);font-family:var(--fh)}
+.qb-desc{font-size:10.5px;color:var(--text3);margin-top:2px}
+
+/* ═══ INBOX */
+#inbox-page{padding:0!important}
+.inbox-shell{display:flex;height:calc(100vh - var(--header-h));overflow:hidden}
+.cl-panel{width:310px;min-width:310px;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.cl-top{padding:12px 12px 8px;border-bottom:1px solid var(--border);flex-shrink:0}
+.cl-top-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:8px}
+.cl-heading{font-family:var(--fh);font-size:14px;font-weight:800}
+.cl-new-btn{background:var(--accent);color:#000;border:none;border-radius:var(--rs);padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--fh)}
+
+/* Number filter bar */
+.num-filter-bar{display:flex;gap:5px;padding:8px 12px;border-bottom:1px solid var(--border);overflow-x:auto;flex-shrink:0}
+.num-filter-bar::-webkit-scrollbar{height:3px}
+.nf-chip{display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);font-size:11px;font-weight:600;color:var(--text2);cursor:pointer;white-space:nowrap;transition:.15s;font-family:var(--fh);flex-shrink:0}
+.nf-chip:hover{border-color:var(--border2);color:var(--text)}
+.nf-chip.active{background:var(--accent-glow);border-color:var(--accent);color:var(--accent)}
+.nf-dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0}
+
+.cl-search{background:var(--surface2);border:1px solid var(--border);border-radius:var(--rs);padding:7px 10px;display:flex;align-items:center;gap:7px;margin-bottom:0}
+.cl-search input{background:none;border:none;outline:none;color:var(--text);font-size:12px;font-family:var(--fb);width:100%}
+.cl-search input::placeholder{color:var(--text3)}
+.cl-tabs{display:flex;gap:2px;padding:8px 12px 0;border-bottom:1px solid var(--border);flex-shrink:0}
+.cl-tab{padding:5px 10px;font-size:11.5px;font-weight:600;color:var(--text3);cursor:pointer;border-radius:4px 4px 0 0;border-bottom:2px solid transparent;transition:.15s;font-family:var(--fh)}
+.cl-tab:hover{color:var(--text2)}
+.cl-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.cl-list{flex:1;overflow-y:auto}
+.ci{display:flex;align-items:flex-start;gap:10px;padding:12px 12px;border-bottom:1px solid var(--border);cursor:pointer;transition:.15s;position:relative}
+.ci:hover{background:var(--surface2)}
+.ci.active{background:var(--surface3)}
+.ci-av{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#000;flex-shrink:0;font-family:var(--fh)}
+.ci-info{flex:1;min-width:0}
+.ci-name{display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:700;color:var(--text);margin-bottom:3px;font-family:var(--fh)}
+.ci-time{font-size:10.5px;color:var(--text3);font-weight:400;font-family:var(--fb)}
+.ci-preview{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;gap:6px}
+.ci-preview>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.ci-unread{background:var(--accent);color:#000;font-size:9px;font-weight:800;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 3px;flex-shrink:0}
+.ci-ai-chip{font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;flex-shrink:0;font-family:var(--fh)}
+.ci-ai-chip:not(.off){background:rgba(0,230,118,.12);color:var(--accent)}
+.ci-ai-chip.off{background:var(--surface3);color:var(--text3)}
+.ci-muted{font-size:10px;margin-left:3px;opacity:.6}
+.ci-num-tag{font-size:9px;color:var(--cyan);font-weight:600;font-family:var(--fh);background:rgba(0,188,212,.1);padding:1px 4px;border-radius:3px;margin-left:3px}
+
+/* chat panel */
+.chat-panel{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.cp-head{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0}
+.cp-av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#000;flex-shrink:0;background:var(--accent);font-family:var(--fh)}
+.cp-name{font-family:var(--fh);font-size:14px;font-weight:800;color:var(--text)}
+.cp-status{font-size:11.5px;color:var(--text3)}
+.cp-actions{display:flex;gap:6px;margin-left:auto}
+.cp-act-btn{display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:var(--rs);border:1px solid var(--border);background:var(--surface2);font-size:11.5px;font-weight:600;cursor:pointer;color:var(--text2);font-family:var(--fb);transition:.15s}
+.cp-act-btn:hover{color:var(--text);border-color:var(--border2)}
+.cp-act-btn.ai-on{background:var(--accent-glow);color:var(--accent);border-color:var(--accent-dark)}
+.msgs{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:4px}
+.msg-row{display:flex;flex-direction:column;max-width:72%}
+.msg-row.out{align-self:flex-end;align-items:flex-end}
+.msg-row.in{align-self:flex-start}
+.msg-bubble{padding:9px 13px;border-radius:12px;font-size:13.5px;line-height:1.55;font-family:var(--fb)}
+.msg-row.in .msg-bubble{background:var(--surface2);color:var(--text);border-bottom-left-radius:2px}
+.msg-row.out .msg-bubble{background:var(--accent-dim);color:#000;font-weight:500;border-bottom-right-radius:2px}
+.msg-meta{font-size:10.5px;color:var(--text3);margin-top:2px;display:flex;align-items:center;gap:5px}
+.ai-sent-tag{font-size:9px;background:rgba(0,230,118,.1);color:var(--accent);padding:1px 5px;border-radius:3px;font-weight:700;font-family:var(--fh)}
+.msg-react{display:flex;gap:4px;margin-top:3px}
+.msg-react span{font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:2px 6px;cursor:pointer}
+.system-msg{text-align:center;font-size:11.5px;color:var(--text3);padding:8px 0;position:relative}
+.system-msg::before,.system-msg::after{content:'';position:absolute;top:50%;width:calc(50% - 50px);height:1px;background:var(--border)}
+.system-msg::before{left:0}.system-msg::after{right:0}
+.poll-bubble{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;min-width:200px}
+.poll-q{font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;font-family:var(--fh)}
+.poll-opt{padding:7px 10px;background:var(--surface3);border-radius:5px;margin-bottom:5px;font-size:12px;color:var(--text);cursor:pointer;display:flex;justify-content:space-between;transition:.15s}
+.poll-opt:hover{background:var(--surface4)}
+.poll-opt.voted{background:var(--accent-glow);color:var(--accent)}
+.location{display:flex;align-items:center;gap:10px;background:#00C45A;border-radius:10px;padding:10px 14px;min-width:160px}
+.ai-suggest-bar{padding:8px 14px;border-top:1px solid var(--border);background:var(--surface);flex-shrink:0}
+.ai-s-label{font-size:10.5px;color:var(--text3);margin-bottom:5px;font-weight:600;font-family:var(--fh)}
+.ai-s-text{font-size:12.5px;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:var(--rs);padding:8px 12px;cursor:pointer;transition:.15s;line-height:1.5}
+.ai-s-text:hover{border-color:var(--accent)}
+.attach-row{display:flex;gap:5px;padding:7px 14px;border-top:1px solid var(--border);background:var(--surface);flex-shrink:0;flex-wrap:wrap}
+.attach-btn{padding:4px 9px;border-radius:var(--rs);border:1px solid var(--border);background:var(--surface2);font-size:11.5px;cursor:pointer;color:var(--text2);transition:.15s;font-family:var(--fb)}
+.attach-btn:hover{color:var(--text);border-color:var(--border2)}
+.chat-input-area{padding:8px 14px 12px;border-top:1px solid var(--border);background:var(--surface);flex-shrink:0}
+.chat-input-row{display:flex;align-items:flex-end;gap:8px}
+.chat-ta{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-family:var(--fb);font-size:13.5px;resize:none;outline:none;transition:.15s;max-height:120px;line-height:1.5}
+.chat-ta:focus{border-color:var(--border2)}
+.chat-ta::placeholder{color:var(--text3)}
+.send-btn{background:var(--accent);border:none;border-radius:8px;width:38px;height:38px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;flex-shrink:0;transition:opacity .15s;color:#000;font-weight:700}
+.send-btn:hover{opacity:.85}
+.cp-icon-btn{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid var(--border);background:var(--surface2);cursor:pointer;font-size:14px;flex-shrink:0;transition:.15s}
+.cp-icon-btn:hover{border-color:var(--border2)}
+.info-panel{width:270px;min-width:270px;border-left:1px solid var(--border);overflow-y:auto;background:var(--surface)}
+.ip-section{padding:14px 14px;border-bottom:1px solid var(--border)}
+.ip-title{font-family:var(--fh);font-size:12px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px}
+.ip-contact-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.ip-avatar{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#000;flex-shrink:0;font-family:var(--fh)}
+.ip-name{font-family:var(--fh);font-size:14px;font-weight:800;color:var(--text)}
+.ip-phone{font-size:12px;color:var(--text2);margin-top:1px}
+.ip-field{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12.5px}
+.ip-field:last-child{border-bottom:none}
+.ip-field-label{color:var(--text3);font-size:11.5px}
+.ip-field-val{color:var(--text);font-weight:500}
+.ip-btn-row{display:flex;gap:5px;flex-wrap:wrap}
+.ip-btn{padding:5px 10px;border-radius:var(--rs);border:1px solid var(--border);background:var(--surface2);font-size:11.5px;cursor:pointer;color:var(--text2);font-family:var(--fb);font-weight:500;transition:.15s}
+.ip-btn:hover{color:var(--text);border-color:var(--border2)}
+.ip-btn.danger{color:var(--red)}
+.profile-pic-wrap{display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:10px;background:var(--surface2);border-radius:var(--rs);cursor:pointer}
+.profile-pic{font-size:32px}
+.profile-pic-label{font-size:11px;color:var(--text3)}
+
+/* ═══ CAMPAIGNS */
+.camp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px}
+.camp-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;cursor:pointer;transition:.2s}
+.camp-card:hover{border-color:var(--border2);transform:translateY(-1px)}
+.cc-status-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.cc-name{font-family:var(--fh);font-size:14px;font-weight:800;margin-bottom:5px}
+.cc-desc{font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:14px}
+.cc-stats{display:flex;gap:14px}
+.cc-stat-val{font-size:15px;font-weight:800;color:var(--text);font-family:var(--fh)}
+.cc-stat-label{font-size:10px;color:var(--text3);margin-top:1px}
+.cc-footer{display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)}
+.cc-date{font-size:11px;color:var(--text3)}
+.cc-actions{display:flex;gap:5px}
+.cc-btn{padding:4px 9px;border-radius:var(--rs);font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:var(--fh);transition:.15s}
+.cc-btn:hover{border-color:var(--border2)}
+.new-camp{border:2px dashed var(--border2);background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:180px;color:var(--text3);transition:.2s;cursor:pointer;border-radius:var(--r)}
+.new-camp:hover{border-color:var(--accent);color:var(--accent)}
+.new-camp-plus{font-size:28px;margin-bottom:8px}
+.new-camp-text{font-size:13px;font-weight:700;font-family:var(--fh)}
+.fu-table{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:14px}
+.fu-table-head{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.fu-table-title{font-family:var(--fh);font-size:13px;font-weight:800}
+.fu-col-head{display:grid;grid-template-columns:2fr 1.2fr 1fr 1fr 1fr 80px;align-items:center;padding:8px 18px;background:var(--surface2);font-size:10.5px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.5px;font-family:var(--fh)}
+.fu-row{display:grid;grid-template-columns:2fr 1.2fr 1fr 1fr 1fr 80px;align-items:center;padding:11px 18px;border-top:1px solid var(--border);transition:.15s}
+.fu-row:hover{background:var(--surface2)}
+.fu-name{font-size:13px;font-weight:700;color:var(--text);font-family:var(--fh)}
+.fu-trigger-type{font-size:12px;color:var(--text2)}
+.fu-delay{font-size:12px;color:var(--orange)}
+.fu-contacts{font-size:12px;color:var(--text)}
+.fu-sent{font-size:12px;color:var(--cyan)}
+.fu-row-actions{display:flex;gap:5px}
+.fu-act-btn{padding:3px 7px;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--text2);font-family:var(--fb)}
+.fu-act-btn:hover{color:var(--text);border-color:var(--border2)}
+
+/* ═══ AI AGENT */
+.ai-layout{display:grid;grid-template-columns:1.1fr 1fr;gap:18px;align-items:start}
+.hrs-table{display:grid;gap:6px}
+.hrs-row{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--rs)}
+.hrs-day{width:36px;font-size:12px;font-weight:700;color:var(--text2);font-family:var(--fh)}
+.hrs-time{flex:1;font-size:12px;color:var(--text)}
+.ai-preview{background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:8px;min-height:280px}
+.prev-bubble{padding:9px 13px;border-radius:10px;font-size:13px;line-height:1.5;max-width:80%;font-family:var(--fb)}
+.prev-bubble.u{background:var(--surface2);color:var(--text)}
+.prev-bubble.a{background:var(--accent-dim);color:#000;font-weight:500;align-self:flex-end;border-bottom-right-radius:2px}
+.save-agent-btn{width:100%;padding:12px;background:var(--accent);color:#000;border:none;border-radius:var(--rs);font-size:14px;font-weight:800;cursor:pointer;font-family:var(--fh);transition:opacity .15s;margin-top:4px}
+.save-agent-btn:hover{opacity:.85}
+.response-setting{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--rs);margin-bottom:7px}
+.rs-label{flex:1;font-size:12.5px;color:var(--text)}
+.rs-val{font-size:13px;font-weight:700;color:var(--accent);font-family:var(--fh);min-width:50px;text-align:right}
+
+/* ═══ ANALYTICS */
+.analytics-grid{display:grid;grid-template-columns:1.5fr 1fr;gap:16px;margin-bottom:16px}
+.chart-container{height:160px;position:relative;display:flex;align-items:flex-end;gap:4px;padding-bottom:20px}
+.a-bar{flex:1;border-radius:3px 3px 0 0;background:var(--surface3);position:relative;transition:.3s;min-height:4px;cursor:pointer}
+.a-bar:hover{filter:brightness(1.2)}
+.a-bar .bar-tip{position:absolute;top:-22px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text2);white-space:nowrap;opacity:0;transition:.2s}
+.a-bar:hover .bar-tip{opacity:1}
+.a-bar-label{position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text3);white-space:nowrap}
+.resp-time-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:12.5px}
+.resp-time-row:last-child{border-bottom:none}
+.resp-time-label{color:var(--text2)}
+.resp-time-val{font-weight:700;color:var(--text);font-family:var(--fh)}
+.top-chat-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.top-chat-row:last-child{border-bottom:none}
+.tc-rank{font-size:12px;font-weight:800;color:var(--text3);width:18px;font-family:var(--fh)}
+.tc-av{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#000;flex-shrink:0;font-family:var(--fh)}
+.tc-name{flex:1;font-size:13px;font-weight:600;color:var(--text);font-family:var(--fh)}
+.tc-msgs{font-size:12px;color:var(--text2)}
+.tc-bar-wrap{width:80px;height:4px;background:var(--surface3);border-radius:2px;overflow:hidden}
+.tc-bar{height:100%;background:var(--accent);border-radius:2px}
+
+/* ═══ CONTACTS */
+.contacts-table{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.ct-head{display:grid;grid-template-columns:40px 2fr 1.5fr 1fr 1fr 80px;padding:10px 16px;background:var(--surface2);font-size:10.5px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);font-family:var(--fh)}
+.ct-row{display:grid;grid-template-columns:40px 2fr 1.5fr 1fr 1fr 80px;padding:11px 16px;border-bottom:1px solid var(--border);align-items:center;transition:.15s}
+.ct-row:last-child{border-bottom:none}
+.ct-row:hover{background:var(--surface2)}
+.ct-checkbox{width:16px;height:16px;border-radius:4px;border:1px solid var(--border2);background:var(--surface3);cursor:pointer;accent-color:var(--accent)}
+.ct-av{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#000;font-family:var(--fh)}
+.ct-name-cell{display:flex;align-items:center;gap:9px}
+.ct-name{font-size:13px;font-weight:600;color:var(--text);font-family:var(--fh)}
+.ct-phone{font-size:12px;color:var(--text2)}
+.ct-label{font-size:12px;color:var(--text)}
+.ct-last{font-size:12px;color:var(--text3)}
+.ct-row-acts{display:flex;gap:4px;justify-content:flex-end}
+.ct-act{padding:3px 7px;border-radius:4px;font-size:11px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--text2);font-family:var(--fb)}
+.ct-act:hover{color:var(--text);border-color:var(--border2)}
+
+/* ═══ STATUS */
+.status-compose{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:20px;margin-bottom:16px}
+.status-input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--rs);padding:14px 16px;color:var(--text);font-family:var(--fb);font-size:14px;resize:none;outline:none;min-height:80px;margin-bottom:12px;transition:.15s}
+.status-input:focus{border-color:var(--accent)}
+.status-input::placeholder{color:var(--text3)}
+.status-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.status-char{font-size:12px;color:var(--text3);margin-left:auto}
+.prev-statuses{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.ps-head{padding:14px 16px;border-bottom:1px solid var(--border);font-family:var(--fh);font-size:13px;font-weight:800}
+.ps-item{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);transition:.15s}
+.ps-item:last-child{border-bottom:none}
+.ps-item:hover{background:var(--surface2)}
+.ps-bubble{background:var(--surface2);border-radius:var(--rs);padding:8px 12px;flex:1;font-size:13px;color:var(--text)}
+.ps-time{font-size:11px;color:var(--text3)}
+.ps-views{font-size:11px;color:var(--cyan);font-weight:700;font-family:var(--fh)}
+
+/* ═══ CALENDAR PAGE */
+.cal-layout{display:grid;grid-template-columns:1fr 340px;gap:18px;align-items:start}
+.cal-connect-banner{background:linear-gradient(135deg,rgba(0,230,118,.08),rgba(0,188,212,.06));border:1px solid rgba(0,230,118,.2);border-radius:var(--r);padding:16px 20px;margin-bottom:18px;display:flex;align-items:center;gap:14px}
+.cal-connect-icon{font-size:32px;flex-shrink:0}
+.cal-connect-title{font-family:var(--fh);font-size:14px;font-weight:800;color:var(--text);margin-bottom:3px}
+.cal-connect-sub{font-size:12px;color:var(--text2);line-height:1.5}
+.cal-connect-btn{margin-left:auto;flex-shrink:0;padding:9px 18px;background:var(--accent);color:#000;border:none;border-radius:var(--rs);font-size:12px;font-weight:800;cursor:pointer;font-family:var(--fh);white-space:nowrap}
+.calendar-grid-header{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px}
+.cal-day-label{text-align:center;font-size:11px;font-weight:700;color:var(--text3);padding:6px 0;font-family:var(--fh)}
+.calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.cal-cell{min-height:72px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:5px;cursor:pointer;transition:.15s;position:relative}
+.cal-cell:hover{border-color:var(--border2)}
+.cal-cell.today{border-color:var(--accent)}
+.cal-cell.other-month{opacity:.4}
+.cal-date{font-size:11px;font-weight:700;color:var(--text2);margin-bottom:3px;font-family:var(--fh)}
+.cal-cell.today .cal-date{color:var(--accent)}
+.cal-event{font-size:10px;padding:2px 5px;border-radius:3px;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;font-family:var(--fh)}
+.cal-event.booking{background:rgba(0,230,118,.15);color:var(--accent)}
+.cal-event.followup{background:rgba(255,143,0,.15);color:var(--orange)}
+.cal-event.reminder{background:rgba(156,111,255,.15);color:var(--purple)}
+.upcoming-list{display:flex;flex-direction:column;gap:8px}
+.upcoming-item{background:var(--surface2);border:1px solid var(--border);border-radius:var(--rs);padding:12px;display:flex;gap:10px;align-items:flex-start}
+.up-date-block{width:38px;text-align:center;flex-shrink:0;background:var(--surface3);border-radius:5px;padding:5px 4px}
+.up-day{font-size:16px;font-weight:900;color:var(--text);font-family:var(--fh);line-height:1}
+.up-mon{font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;font-family:var(--fh)}
+.up-info{flex:1;min-width:0}
+.up-title{font-size:13px;font-weight:700;color:var(--text);font-family:var(--fh);margin-bottom:2px}
+.up-sub{font-size:11px;color:var(--text2)}
+.up-type{font-size:9px;padding:2px 5px;border-radius:3px;font-weight:700;font-family:var(--fh)}
+.up-type.booking{background:rgba(0,230,118,.15);color:var(--accent)}
+.up-type.auto{background:rgba(0,188,212,.12);color:var(--cyan)}
+.cal-ai-status{background:rgba(0,230,118,.06);border:1px solid rgba(0,230,118,.15);border-radius:var(--rs);padding:10px 14px;font-size:12px;color:var(--text2);display:flex;align-items:center;gap:8px;margin-bottom:14px}
+
+/* ═══ SETTINGS */
+.settings-grid{display:grid;grid-template-columns:200px 1fr;gap:20px;min-height:400px}
+.settings-nav{display:flex;flex-direction:column;gap:2px}
+.sn-item{padding:8px 12px;border-radius:var(--rs);cursor:pointer;font-size:13px;font-weight:500;color:var(--text2);transition:.15s;font-family:var(--fb)}
+.sn-item:hover{background:var(--surface2);color:var(--text)}
+.sn-item.active{background:var(--accent-glow);color:var(--accent);font-weight:700;font-family:var(--fh)}
+.settings-panel{display:none}
+.settings-panel.active{display:block}
+
+/* ═══ CONSENT BANNER */
+.consent-banner{background:rgba(255,143,0,.05);border:1px solid rgba(255,143,0,.25);border-radius:var(--r);padding:14px 18px;margin-bottom:20px}
+.consent-title{font-family:var(--fh);font-size:13px;font-weight:800;color:var(--orange);margin-bottom:6px;display:flex;align-items:center;gap:7px}
+.consent-text{font-size:11.5px;color:var(--text2);line-height:1.7}
+.consent-text strong{color:var(--text)}
+.consent-check{display:flex;align-items:flex-start;gap:8px;margin-top:10px;cursor:pointer}
+.consent-check input{margin-top:2px;accent-color:var(--accent);flex-shrink:0}
+.consent-check span{font-size:11.5px;color:var(--text2);line-height:1.6}
+
+/* ═══ MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:100;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s;backdrop-filter:blur(2px)}
+.modal-overlay.open{opacity:1;pointer-events:all}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:var(--rl);padding:24px;min-width:420px;max-width:600px;width:90%;max-height:88vh;overflow-y:auto;transform:translateY(10px);transition:transform .2s;box-shadow:var(--shadow)}
+.modal-overlay.open .modal{transform:translateY(0)}
+.modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.modal-title{font-family:var(--fh);font-size:16px;font-weight:800}
+.modal-close{background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;padding:2px;line-height:1}
+.modal-close:hover{color:var(--text)}
+.modal-actions{display:flex;gap:10px;margin-top:20px;justify-content:flex-end}
+.file-upload-zone{background:var(--bg);border:2px dashed var(--border2);border-radius:var(--rs);padding:20px;text-align:center;cursor:pointer;transition:.2s;margin-bottom:12px}
+.file-upload-zone:hover{border-color:var(--accent)}
+.file-upload-zone input[type=file]{display:none}
+
+/* ═══ TOAST */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--rs);padding:12px 16px;font-size:13px;font-weight:500;color:var(--text);z-index:999;opacity:0;transform:translateY(8px);transition:all .25s;pointer-events:none;display:flex;align-items:center;gap:8px;box-shadow:var(--shadow);font-family:var(--fb)}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast-icon{font-size:16px}
+
+/* ═══ BUSINESS PROFILE FORM */
+.biz-form-section{background:var(--surface2);border:1px solid var(--border);border-radius:var(--rs);padding:14px;margin-bottom:12px}
+.biz-form-section-title{font-family:var(--fh);font-size:12px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px}
+.form-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+@media(max-width:1200px){.cal-layout{grid-template-columns:1fr}.ai-layout{grid-template-columns:1fr}}
+@media(max-width:1100px){.grid-4{grid-template-columns:1fr 1fr}.kpi-grid{grid-template-columns:1fr 1fr}.camp-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:900px){.overview-mid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════ SIDEBAR -->
+<aside id="sidebar">
+  <div class="logo-wrap">
+    <div class="logo-mark">💬</div>
+    <div>
+      <div class="logo-name">WaizAI<span class="logo-tag">BETA</span></div>
+    </div>
+  </div>
+
+  <!-- Number Switcher -->
+  <div class="num-switcher">
+    <div class="ns-header" onclick="toggleNumSwitcher()">
+      <div class="ns-left">
+        <div class="ns-pulse"></div>
+        <div>
+          <div class="ns-num">+91 98765 43210</div>
+          <div class="ns-label">Sharma Electronics · Active</div>
+        </div>
+      </div>
+      <div class="ns-chevron" id="ns-chevron">▾</div>
+    </div>
+    <div class="ns-dropdown" id="ns-dropdown">
+      <div class="ns-option active" onclick="switchNumber(this,'All Numbers')">
+        <div class="ns-opt-dot green"></div>
+        <div>
+          <div class="ns-opt-name">All Numbers</div>
+          <div class="ns-opt-sub">View all messages together</div>
+        </div>
+        <span class="ns-opt-badge all">All</span>
+      </div>
+      <div class="ns-option" onclick="switchNumber(this,'+91 98765 43210')">
+        <div class="ns-opt-dot green"></div>
+        <div>
+          <div class="ns-opt-name">+91 98765 43210</div>
+          <div class="ns-opt-sub">Sharma Electronics · Main</div>
+        </div>
+        <span class="ns-opt-badge active-b">Active</span>
+      </div>
+      <div class="ns-option" onclick="switchNumber(this,'+91 91234 56789')">
+        <div class="ns-opt-dot green"></div>
+        <div>
+          <div class="ns-opt-name">+91 91234 56789</div>
+          <div class="ns-opt-sub">Sharma Electronics · Support</div>
+        </div>
+        <span class="ns-opt-badge active-b">Active</span>
+      </div>
+      <div class="ns-option" onclick="switchNumber(this,'+91 99000 11223')">
+        <div class="ns-opt-dot gray"></div>
+        <div>
+          <div class="ns-opt-name">+91 99000 11223</div>
+          <div class="ns-opt-sub">Seasonal Line · Paused</div>
+        </div>
+      </div>
+      <div class="ns-option" onclick="openModal('add-number')" style="border-top:1px dashed var(--border2);color:var(--accent)">
+        <div style="font-size:14px">＋</div>
+        <div>
+          <div class="ns-opt-name" style="color:var(--accent)">Add New Number</div>
+          <div class="ns-opt-sub">Scan QR to connect</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-group-label">Main</div>
+    <div class="nav-item active" onclick="navigate('overview',this)"><span class="nav-ic">🏠</span>Overview</div>
+    <div class="nav-item" onclick="navigate('inbox',this)"><span class="nav-ic">💬</span>Inbox <span class="nav-badge">12</span></div>
+    <div class="nav-item" onclick="navigate('contacts',this)"><span class="nav-ic">👥</span>Contacts</div>
+    <div class="nav-item" onclick="navigate('calendar',this)"><span class="nav-ic">📅</span>Calendar</div>
+  </div>
+
+  <div class="nav-divider"></div>
+
+  <div class="nav-section">
+    <div class="nav-group-label">Automation</div>
+    <div class="nav-item" onclick="navigate('campaigns',this)"><span class="nav-ic">📣</span>Campaigns</div>
+    <div class="nav-item" onclick="navigate('followups',this)"><span class="nav-ic">🔄</span>Follow-ups</div>
+    <div class="nav-item" onclick="navigate('ai-agent',this)"><span class="nav-ic">🤖</span>AI Agent</div>
+  </div>
+
+  <div class="nav-divider"></div>
+
+  <div class="nav-section">
+    <div class="nav-group-label">More</div>
+    <div class="nav-item" onclick="navigate('analytics',this)"><span class="nav-ic">📊</span>Analytics</div>
+    <div class="nav-item" onclick="navigate('status',this)"><span class="nav-ic">🟢</span>Status</div>
+    <div class="nav-item" onclick="navigate('settings',this)"><span class="nav-ic">⚙️</span>Settings</div>
+  </div>
+
+  <div class="sidebar-foot">
+    <div class="sf-user">
+      <div class="sf-av">R</div>
+      <div>
+        <div class="sf-name">Rahul Sharma</div>
+        <div class="sf-role">Pro Plan · Owner</div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- ══════════════════ MAIN -->
+<div id="main">
+  <div id="topbar">
+    <div>
+      <div class="tb-title" id="tb-title">Overview</div>
+      <div class="tb-sub" id="tb-sub">Good morning, Rahul 👋</div>
+    </div>
+    <div class="tb-spacer"></div>
+    <div class="tb-search"><span style="color:var(--text3)">🔍</span><input placeholder="Search chats, contacts…"/></div>
+    <button class="tb-btn ghost" onclick="openModal('add-number')">➕ Add Number</button>
+    <div class="tb-notif" onclick="showToast('🔔 3 new notifications')">🔔<div class="tb-notif-dot"></div></div>
+    <div class="tb-avatar">R</div>
+  </div>
+
+  <div id="content">
+
+    <!-- ══════ OVERVIEW -->
+    <div class="page active" id="overview">
+      <div class="overview-welcome">
+        <div class="ow-text">
+          <h2>Good morning, Rahul! 👋</h2>
+          <p>Your AI agent handled 47 messages while you were away.</p>
+        </div>
+        <div class="ai-master-toggle">
+          <div><div class="amt-label">AI Master Switch</div><div class="amt-status" id="ams-txt">● Active</div></div>
+          <label class="sw"><input type="checkbox" checked onchange="document.getElementById('ams-txt').textContent=this.checked?'● Active':'○ Paused';document.getElementById('ams-txt').style.color=this.checked?'var(--accent)':'var(--text3)'"><div class="sw-slider"></div></label>
+        </div>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi"><div class="kpi-icon">💬</div><div class="kpi-val">1,284</div><div class="kpi-label">Total Messages Today</div><span class="kpi-delta up">▲ 12% vs yesterday</span></div>
+        <div class="kpi"><div class="kpi-icon">🤖</div><div class="kpi-val">94%</div><div class="kpi-label">AI Handle Rate</div><span class="kpi-delta up">▲ 3% this week</span></div>
+        <div class="kpi"><div class="kpi-icon">📅</div><div class="kpi-val">7</div><div class="kpi-label">Appointments Today</div><span class="kpi-delta up">▲ 2 new</span></div>
+        <div class="kpi"><div class="kpi-icon">⚡</div><div class="kpi-val">1.8s</div><div class="kpi-label">Avg. Response Time</div><span class="kpi-delta up">▲ Faster</span></div>
+      </div>
+
+      <div class="overview-mid">
+        <div class="card">
+          <div class="card-head"><div class="card-title">📈 Messages This Week</div><span class="card-action" onclick="navigate('analytics',document.querySelector('[onclick*=analytics]'))">View all</span></div>
+          <div class="chart-bars" id="ov-chart"></div>
+          <div class="chart-labels" id="ov-labels"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div class="card-title">⚡ Quick Actions</div></div>
+          <div class="quick-grid">
+            <div class="quick-btn" onclick="navigate('ai-agent',document.querySelector('[onclick*=ai-agent]'))"><div class="qb-icon">🤖</div><div class="qb-title">AI Agent</div><div class="qb-desc">Configure responses</div></div>
+            <div class="quick-btn" onclick="navigate('campaigns',document.querySelector('[onclick*=campaigns]'))"><div class="qb-icon">📣</div><div class="qb-title">New Campaign</div><div class="qb-desc">Broadcast messages</div></div>
+            <div class="quick-btn" onclick="navigate('calendar',document.querySelector('[onclick*=calendar]'))"><div class="qb-icon">📅</div><div class="qb-title">Calendar</div><div class="qb-desc">View appointments</div></div>
+            <div class="quick-btn" onclick="openModal('add-number')"><div class="qb-icon">📱</div><div class="qb-title">Add Number</div><div class="qb-desc">Connect new device</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-head"><div class="card-title">🕐 Recent Activity</div></div>
+          <div class="activity-item"><div class="act-dot" style="background:var(--accent)"></div><div><div class="act-text">AI replied to <b>Priya Mehta</b> about Samsung TV pricing</div><div class="act-time">2 minutes ago</div></div></div>
+          <div class="activity-item"><div class="act-dot" style="background:var(--cyan)"></div><div><div class="act-text">📅 Appointment booked for <b>Ravi Kumar</b> on Dec 15</div><div class="act-time">18 minutes ago</div></div></div>
+          <div class="activity-item"><div class="act-dot" style="background:var(--orange)"></div><div><div class="act-text">Follow-up sent to <b>34 contacts</b> in Diwali campaign</div><div class="act-time">1 hour ago</div></div></div>
+          <div class="activity-item"><div class="act-dot" style="background:var(--purple)"></div><div><div class="act-text">New contact <b>Suresh Patel</b> added from WhatsApp</div><div class="act-time">2 hours ago</div></div></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div class="card-title">📅 Today's Appointments</div><span class="card-action" onclick="navigate('calendar',document.querySelector('[onclick*=calendar]'))">View calendar</span></div>
+          <div id="today-appts"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ INBOX -->
+    <div class="page" id="inbox-page" style="padding:0!important">
+      <div class="inbox-shell">
+        <!-- Chat List -->
+        <div class="cl-panel">
+          <div class="cl-top">
+            <div class="cl-top-row">
+              <span class="cl-heading">Inbox</span>
+              <button class="cl-new-btn" onclick="openModal('new-chat')">+ New Chat</button>
+            </div>
+            <div class="cl-search"><span style="color:var(--text3);font-size:13px">🔍</span><input placeholder="Search conversations…"/></div>
+          </div>
+          <!-- Number filter -->
+          <div class="num-filter-bar" id="num-filter-bar">
+            <div class="nf-chip active" onclick="filterNum(this,'all')"><div class="nf-dot"></div>All</div>
+            <div class="nf-chip" onclick="filterNum(this,'98765')"><div class="nf-dot" style="background:var(--accent)"></div>·43210</div>
+            <div class="nf-chip" onclick="filterNum(this,'91234')"><div class="nf-dot" style="background:var(--cyan)"></div>·56789</div>
+            <div class="nf-chip" onclick="filterNum(this,'99000')"><div class="nf-dot" style="background:var(--text3)"></div>·11223</div>
+          </div>
+          <div class="cl-tabs">
+            <div class="cl-tab active" onclick="switchTab(this,'All')">All</div>
+            <div class="cl-tab" onclick="switchTab(this,'Unread')">Unread</div>
+            <div class="cl-tab" onclick="switchTab(this,'AI Active')">AI On</div>
+            <div class="cl-tab" onclick="switchTab(this,'Human')">Human</div>
+          </div>
+          <div class="cl-list" id="chat-list"></div>
+        </div>
+
+        <!-- Chat Panel -->
+        <div class="chat-panel">
+          <div class="cp-head">
+            <div class="cp-av" id="cp-av">P</div>
+            <div>
+              <div class="cp-name" id="cp-name">Priya Mehta <span class="badge green">AI Active</span></div>
+              <div class="cp-status" id="cp-status">🟢 Online · 2 min ago · <span style="color:var(--cyan);font-size:10px">·43210</span></div>
+            </div>
+            <div class="cp-actions">
+              <button class="cp-act-btn ai-on" id="ai-toggle-btn" onclick="toggleAIForChat(this)">🤖 AI On</button>
+              <button class="cp-act-btn" onclick="showToast('📞 Calling...')">📞</button>
+              <button class="cp-act-btn" onclick="showToast('🎥 Video call...')">🎥</button>
+              <button class="cp-act-btn" onclick="showToast('🔍 Search in chat')">🔍</button>
+              <button class="cp-act-btn" onclick="openModal('schedule-msg')">⏰ Schedule</button>
+            </div>
+          </div>
+          <div class="msgs" id="msgs"></div>
+          <div class="ai-suggest-bar">
+            <div class="ai-s-label">🤖 AI SUGGESTION</div>
+            <div class="ai-s-text" onclick="useAISuggestion()">Sure! The Samsung 65" QLED is currently in stock at ₹89,999. We also have a 10% Diwali discount available. Would you like me to send more details? <span style="color:var(--accent);font-size:11px;font-weight:700">← Use this</span></div>
+          </div>
+          <div class="attach-row">
+            <div class="attach-btn" onclick="showToast('📸 Media picker opened')">📸 Photo</div>
+            <div class="attach-btn" onclick="showToast('📄 Document picker opened')">📄 Doc</div>
+            <div class="attach-btn" onclick="openModal('create-poll')">📊 Poll</div>
+            <div class="attach-btn" onclick="openModal('send-location')">📍 Location</div>
+            <div class="attach-btn" onclick="openModal('send-contact')">👤 Contact</div>
+            <div class="attach-btn" onclick="showToast('⚠️ Buttons only available if enabled by superadmin')">🔘 Buttons <span style="font-size:10px;color:var(--orange)">SA</span></div>
+          </div>
+          <div class="chat-input-area">
+            <div class="chat-input-row">
+              <textarea class="chat-ta" id="chat-ta" placeholder="Type a message… (Shift+Enter for new line)" rows="1" oninput="autoResize(this)" onkeydown="handleKey(event)"></textarea>
+              <div class="cp-icon-btn" title="Schedule message" onclick="openModal('schedule-msg')">⏰</div>
+              <button class="send-btn" onclick="sendMessage()">➤</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Info Panel -->
+        <div class="info-panel" id="info-panel">
+          <div class="ip-section">
+            <div class="ip-title">Contact Info</div>
+            <div class="profile-pic-wrap"><div class="profile-pic">👩</div><div class="profile-pic-label">Tap to view profile photo</div></div>
+            <div class="ip-contact-head">
+              <div class="ip-avatar" style="background:var(--accent)">P</div>
+              <div><div class="ip-name">Priya Mehta</div><div class="ip-phone">+91 98765 43210</div></div>
+            </div>
+            <div class="ip-field"><span class="ip-field-label">Label</span><span class="badge blue">Lead</span></div>
+            <div class="ip-field"><span class="ip-field-label">Status</span><span class="ip-field-val">🟢 Online</span></div>
+            <div class="ip-field"><span class="ip-field-label">First Contact</span><span class="ip-field-val">Nov 1, 2024</span></div>
+            <div class="ip-field"><span class="ip-field-label">Messages</span><span class="ip-field-val">47</span></div>
+            <div class="ip-btn-row" style="margin-top:10px">
+              <button class="ip-btn" onclick="showToast('👤 Opening full profile')">Profile</button>
+              <button class="ip-btn" onclick="openModal('book-appointment')">📅 Book</button>
+              <button class="ip-btn danger" onclick="showToast('🚫 Contact blocked')">Block</button>
+            </div>
+          </div>
+          <div class="ip-section">
+            <div class="ip-title">AI Settings for Chat</div>
+            <div class="toggle-row"><div class="toggle-row-info"><div class="toggle-row-label">AI Auto-Reply</div></div><label class="sw"><input type="checkbox" checked><div class="sw-slider"></div></label></div>
+            <div class="toggle-row"><div class="toggle-row-info"><div class="toggle-row-label">Smart Follow-up</div></div><label class="sw"><input type="checkbox" checked><div class="sw-slider"></div></label></div>
+            <div class="toggle-row"><div class="toggle-row-info"><div class="toggle-row-label">Auto-Book Appointments</div></div><label class="sw"><input type="checkbox" checked><div class="sw-slider"></div></label></div>
+          </div>
+          <div class="ip-section">
+            <div class="ip-title">Upcoming</div>
+            <div style="background:rgba(0,230,118,.08);border:1px solid rgba(0,230,118,.2);border-radius:var(--rs);padding:10px;font-size:12px">
+              <div style="color:var(--accent);font-weight:700;font-family:var(--fh)">📅 Dec 15 – 11:00 AM</div>
+              <div style="color:var(--text2);margin-top:2px">Store visit · AI Booked</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ CONTACTS -->
+    <div class="page" id="contacts">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+        <div><div class="section-title">Contacts</div><div class="section-sub" style="margin-bottom:0">1,284 contacts synced</div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-ghost" onclick="showToast('📥 Import started')">📥 Import CSV</button>
+          <button class="btn btn-primary" onclick="openModal('add-contact')">+ Add Contact</button>
+        </div>
+      </div>
+      <div class="contacts-table">
+        <div class="ct-head"><div></div><div>Name</div><div>Phone</div><div>Label</div><div>Last Message</div><div>Actions</div></div>
+        <div id="contacts-body"></div>
+      </div>
+    </div>
+
+    <!-- ══════ CALENDAR -->
+    <div class="page" id="calendar">
+      <div class="section-title">Calendar</div>
+      <div class="section-sub">Appointments · Follow-ups · AI Auto-Bookings</div>
+
+      <div class="cal-connect-banner" id="cal-connect-banner">
+        <div class="cal-connect-icon">📅</div>
+        <div>
+          <div class="cal-connect-title">Connect Google Calendar</div>
+          <div class="cal-connect-sub">Let your AI agent automatically book appointments directly in your calendar when customers ask during chat.</div>
+        </div>
+        <button class="cal-connect-btn" onclick="connectGCal()">Connect Google Calendar</button>
+      </div>
+
+      <div class="cal-ai-status">
+        <span style="color:var(--accent);font-size:16px">🤖</span>
+        <span><strong style="color:var(--accent)">AI Calendar Assistant is active.</strong> It will automatically book, reschedule or cancel appointments based on conversation context — only for slots within your business hours.</span>
+      </div>
+
+      <div class="cal-layout">
+        <div class="card" style="padding:16px">
+          <div class="card-head">
+            <div class="card-title">
+              <button onclick="changeCalMonth(-1)" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:14px;padding:2px 6px">‹</button>
+              <span id="cal-month-label" style="font-family:var(--fh);font-size:15px;font-weight:800">December 2024</span>
+              <button onclick="changeCalMonth(1)" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:14px;padding:2px 6px">›</button>
+            </div>
+            <button class="btn btn-primary" style="padding:6px 12px;font-size:12px" onclick="openModal('new-appointment')">+ Add</button>
+          </div>
+          <div class="calendar-grid-header" id="cal-day-labels"></div>
+          <div class="calendar-grid" id="cal-grid"></div>
+          <div style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)"><div style="width:10px;height:10px;border-radius:2px;background:rgba(0,230,118,.3)"></div>Booking</div>
+            <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)"><div style="width:10px;height:10px;border-radius:2px;background:rgba(255,143,0,.3)"></div>Follow-up</div>
+            <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)"><div style="width:10px;height:10px;border-radius:2px;background:rgba(156,111,255,.3)"></div>Reminder</div>
+          </div>
+        </div>
+        <div>
+          <div class="card" style="margin-bottom:14px">
+            <div class="card-head"><div class="card-title">⏰ Upcoming</div></div>
+            <div class="upcoming-list" id="upcoming-list"></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><div class="card-title">🤖 AI Bookings Today</div></div>
+            <div style="font-size:12px;color:var(--text2);line-height:1.7">AI made <strong style="color:var(--accent)">3 bookings</strong> today through chat conversations. All confirmed and added to your Google Calendar.</div>
+            <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px" id="ai-bookings-list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ CAMPAIGNS -->
+    <div class="page" id="campaigns">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+        <div><div class="section-title">Campaigns & Broadcasts</div><div class="section-sub" style="margin-bottom:0">Send to groups · Schedule · Track performance</div></div>
+        <button class="btn btn-primary" onclick="openModal('new-broadcast')">+ New Campaign</button>
+      </div>
+      <div class="camp-grid" id="camp-grid"></div>
+      <div class="fu-table">
+        <div class="fu-table-head">
+          <div class="fu-table-title">🔄 Follow-up Sequences</div>
+          <button class="btn btn-primary" style="padding:6px 12px;font-size:12px" onclick="openModal('new-followup')">+ Add Follow-up</button>
+        </div>
+        <div class="fu-col-head"><div>Name</div><div>Trigger</div><div>Delay</div><div>Contacts</div><div>Sent</div><div>Actions</div></div>
+        <div id="fu-rows"></div>
+      </div>
+    </div>
+
+    <!-- ══════ FOLLOW-UPS -->
+    <div class="page" id="followups">
+      <div class="section-title">Follow-up Sequences</div>
+      <div class="section-sub">Automated follow-ups based on triggers · Nurture leads on autopilot</div>
+      <div style="display:flex;gap:10px;margin-bottom:20px">
+        <button class="btn btn-primary" onclick="openModal('new-followup')">+ New Follow-up</button>
+      </div>
+      <div class="fu-table">
+        <div class="fu-col-head"><div>Name</div><div>Trigger</div><div>Delay</div><div>Contacts</div><div>Sent</div><div>Actions</div></div>
+        <div id="fu-rows-2"></div>
+      </div>
+    </div>
+
+    <!-- ══════ AI AGENT -->
+    <div class="page" id="ai-agent">
+      <div class="section-title">AI Agent Configuration</div>
+      <div class="section-sub">Teach your AI about your business · Set business hours · Upload documents</div>
+
+      <div class="consent-banner">
+        <div class="consent-title">⚠️ Terms of Use & Liability Notice</div>
+        <div class="consent-text">
+          By using the WaizAI platform and AI agent, you acknowledge that <strong>you are solely responsible</strong> for all messages sent through your connected WhatsApp number — whether sent manually or via AI agent automation.<br><br>
+          WaizAI provides tools and infrastructure. <strong>We do not guarantee delivery, inbox rates, or prevent number bans.</strong> If your WhatsApp number is reported, restricted, or banned due to your messaging activity, spam, or violation of WhatsApp's Terms of Service — <strong>WaizAI bears zero liability.</strong> Users are fully and solely responsible for their interactions with any third party.
+        </div>
+        <label class="consent-check" id="consent-check">
+          <input type="checkbox" onchange="document.getElementById('consent-check').style.opacity=this.checked?'0.7':'1'">
+          <span>I understand and accept full responsibility for all messages sent via this platform. I confirm I will not misuse this system for spam, harassment, or unsolicited bulk messaging.</span>
+        </label>
+      </div>
+
+      <div class="ai-layout">
+        <div>
+          <div class="card" style="margin-bottom:14px">
+            <div class="card-head"><div class="card-title">🏢 Business Profile</div><span class="card-action" onclick="showToast('💾 Saving...')">Save</span></div>
+            <div style="background:rgba(0,188,212,.06);border:1px solid rgba(0,188,212,.15);border-radius:var(--rs);padding:10px 14px;font-size:12px;color:var(--cyan);margin-bottom:14px">💡 The more detail you provide here, the better your AI agent will respond to customers.</div>
+
+            <div class="biz-form-section">
+              <div class="biz-form-section-title">🏪 Basic Information</div>
+              <div class="form-grid-2">
+                <div class="form-group"><label class="form-label">Business Name <span class="req">*</span></label><input class="form-input" value="Sharma Electronics" placeholder="Your business name"/></div>
+                <div class="form-group"><label class="form-label">Business Type <span class="req">*</span></label><select class="form-input"><option>Retail / Shop</option><option>Services</option><option>Restaurant / Food</option><option>Healthcare / Clinic</option><option>Real Estate</option><option>Education / Coaching</option><option>E-commerce</option><option>Consulting</option><option>Salon / Spa</option><option>Logistics / Transport</option><option>Other</option></select></div>
+              </div>
+              <div class="form-group"><label class="form-label">Business Address</label><input class="form-input" value="Shop No. 12, MG Road, Jaipur, Rajasthan 302001" placeholder="Full address"/></div>
+              <div class="form-grid-2">
+                <div class="form-group"><label class="form-label">City <span class="req">*</span></label><input class="form-input" value="Jaipur" placeholder="City"/></div>
+                <div class="form-group"><label class="form-label">State</label><input class="form-input" value="Rajasthan" placeholder="State"/></div>
+              </div>
+              <div class="form-grid-2">
+                <div class="form-group"><label class="form-label">Website (optional)</label><input class="form-input" placeholder="https://yoursite.com"/></div>
+                <div class="form-group"><label class="form-label">GST / PAN (optional)</label><input class="form-input" placeholder="For invoice purposes"/></div>
+              </div>
+            </div>
+
+            <div class="biz-form-section">
+              <div class="biz-form-section-title">🛒 Products & Services</div>
+              <div class="form-group"><label class="form-label">What do you sell / offer? <span class="req">*</span></label><textarea class="form-input" rows="4" placeholder="Describe your products and services in detail…">We sell consumer electronics including TVs, mobiles, laptops and home appliances. We also offer repair services and extended warranties.</textarea></div>
+              <div class="form-group"><label class="form-label">Price Range</label><select class="form-input"><option>Budget (₹ under 1,000)</option><option selected>Mid-range (₹1,000–₹50,000)</option><option>Premium (₹50,000+)</option><option>Custom / Quote-based</option></select></div>
+              <div class="form-group"><label class="form-label">Key Differentiators</label><textarea class="form-input" rows="3" placeholder="What makes you special? e.g. Lowest prices, fastest delivery, 5yr warranty, free installation…"></textarea></div>
+              <div class="form-group"><label class="form-label">Frequently Asked Questions</label><textarea class="form-input" rows="5" placeholder="List common Q&A pairs your AI should know. E.g.:&#10;Q: Do you offer EMI?&#10;A: Yes, 0% EMI on orders above ₹10,000…"></textarea></div>
+            </div>
+
+            <div class="biz-form-section">
+              <div class="biz-form-section-title">📞 Contact & Support</div>
+              <div class="form-grid-2">
+                <div class="form-group"><label class="form-label">Support Phone</label><input class="form-input" placeholder="+91 XXXXX XXXXX"/></div>
+                <div class="form-group"><label class="form-label">Support Email</label><input class="form-input" placeholder="support@yourshop.com"/></div>
+              </div>
+              <div class="form-group"><label class="form-label">Escalation Message <span class="lbl-badge">When AI can't answer</span></label><textarea class="form-input" rows="2" placeholder="e.g. Our team will personally assist you. Please call +91 98765 43210 or visit us at MG Road."></textarea></div>
+            </div>
+
+            <div class="biz-form-section">
+              <div class="biz-form-section-title">🤝 Booking & Appointments</div>
+              <div class="toggle-row"><div class="toggle-row-info"><div class="toggle-row-label">AI can book appointments</div><div class="toggle-row-sub">AI will schedule meetings/visits in your Google Calendar</div></div><label class="sw"><input type="checkbox" checked><div class="sw-slider"></div></label></div>
+              <div class="toggle-row" style="margin-top:2px"><div class="toggle-row-info"><div class="toggle-row-label">Confirm before booking</div><div class="toggle-row-sub">Ask user to confirm before finalizing</div></div><label class="sw"><input type="checkbox" checked><div class="sw-slider"></div></label></div>
+              <div class="form-group" style="margin-top:10px;margin-bottom:0"><label class="form-label">Appointment Types</label><textarea class="form-input" rows="3" placeholder="e.g. Store visit, Product demo, Service repair, Consultation…"></textarea></div>
+            </div>
+
+            <div class="biz-form-section">
+              <div class="biz-form-section-title">🗣️ AI Personality & Language</div>
+              <div class="form-grid-2">
+                <div class="form-group"><label class="form-label">Tone <span class="req">*</span></label><select class="form-input"><option>Friendly & Professional</option><option>Formal</option><option>Casual & Conversational</option><option>Enthusiastic</option><option>Hindi + English (Hinglish)</option></select></div>
+                <div class="form-group"><label class="form-label">Reply Language</label><select class="form-input"><option>Match customer language</option><option>Hindi</option><option>English</option><option>Hinglish</option><option>Marathi</option><option>Bengali</option><option>Tamil</option><option>Telugu</option><option>Gujarati</option></select></div>
+              </div>
+              <div class="form-group"><label class="form-label">Custom Instructions</label><textarea class="form-input" rows="3" placeholder="E.g. Always ask for customer name first. Never promise specific delivery dates. Always offer EMI option…"></textarea></div>
+              <div class="form-group"><label class="form-label">Words / Phrases to NEVER say</label><textarea class="form-input" rows="2" placeholder="e.g. sorry, I don't know, I'm just an AI…"></textarea></div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-bottom:14px">
+            <div class="card-head"><div class="card-title">⚙️ Response Settings</div></div>
+            <div class="response-setting"><span class="rs-label">Max response length</span><span class="rs-val" id="rs-len">200 chars</span><input type="range" min="50" max="500" value="200" style="flex:1;margin-left:10px;accent-color:var(--accent)" oninput="document.getElementById('rs-len').textContent=this.value+' chars'"/></div>
+            <div class="response-setting"><span class="rs-label">Min message delay</span><span class="rs-val" id="rs-min">2s</span><input type="range" min="1" max="30" value="2" style="flex:1;margin-left:10px;accent-color:var(--accent)" oninput="document.getElementById('rs-min').textContent=this.value+'s'"/></div>
+            <div class="response-setting"><span class="rs-label">Max message delay (random gap)</span><span class="rs-val" id="rs-max">8s</span><input type="range" min="2" max="120" value="8" style="flex:1;margin-left:10px;accent-color:var(--accent)" oninput="document.getElementById('rs-max').textContent=this.value+'s'"/></div>
+            <div style="font-size:11px;color:var(--text3);padding:6px 12px;background:var(--surface2);border-radius:var(--rs);margin-bottom:8px">⚡ AI will respond after a random delay between Min and Max values — making replies feel more natural and human-like.</div>
+            <div class="toggle-row"><div class="toggle-row-info"><div class="toggle-row-label">React to messages automatically</div><div class="toggle-row-sub">AI adds emoji reactions to customer messages</div></div><label class="sw"><input type="checkbox" checked><div class="sw-slider"></div></label></div>
+            <div class="toggle-row"><div class="toggle-row-info"><div class="toggle-row-label">Send typing indicator</div><div class="toggle-row-sub">Show "typing…" before responding</div></div><label class="sw"><input type="checkbox" checked><div class="sw-slider"></div></label></div>
+            <div class="toggle-row"><div class="toggle-row-info"><div class="toggle-row-label">Reply to group messages</div><div class="toggle-row-sub">AI will respond only when mentioned in groups</div></div><label class="sw"><input type="checkbox"><div class="sw-slider"></div></label></div>
+          </div>
+
+          <div class="card" style="margin-bottom:14px">
+            <div class="card-head"><div class="card-title">🕐 Business Hours (AI Active)</div></div>
+            <div class="hrs-table" id="hrs-table"></div>
+            <div style="margin-top:12px">
+              <div class="toggle-row"><div class="toggle-row-info"><div class="toggle-row-label">Out-of-hours auto-message</div><div class="toggle-row-sub">Inform customer when AI is offline</div></div><label class="sw"><input type="checkbox" checked><div class="sw-slider"></div></label></div>
+              <div class="form-group" style="margin-top:10px;margin-bottom:0"><textarea class="form-input" rows="2">Hi! We're currently closed. Our team will reply during business hours (9 AM – 7 PM). Thank you! 🙏</textarea></div>
+            </div>
+          </div>
+
+          <button class="save-agent-btn" onclick="showToast('✅ AI Agent settings saved successfully!')">Save All AI Agent Settings</button>
+        </div>
+
+        <div>
+          <div class="card" style="margin-bottom:14px">
+            <div class="card-head"><div class="card-title">👁️ Live Preview</div></div>
+            <div class="ai-preview" id="ai-preview">
+              <div class="prev-bubble u">Hello, kya aapke paas Samsung TV available hai?</div>
+              <div class="prev-bubble a">Bilkul! 😊 Sharma Electronics mein Samsung ke sabse naye models available hain — 43" se 85" tak. Aap kaunsa size dekhna chahenge? Aaj hamare paas special Diwali offers bhi hain! 🎁</div>
+              <div class="prev-bubble u">Price kya hai 55 inch ka?</div>
+              <div class="prev-bubble a">55" Samsung Crystal UHD ₹52,999 mein available hai. 10% Diwali discount ke saath aapko ₹47,699 mein milega! Kya store visit book karein? 🎉</div>
+            </div>
+            <button class="btn btn-ghost" style="width:100%;margin-top:10px" onclick="showToast('🔄 Preview refreshed')">↻ Refresh Preview</button>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><div class="card-title">📦 Knowledge Base</div></div>
+            <div class="file-upload-zone" onclick="document.getElementById('kb-file').click()">
+              <input type="file" id="kb-file" multiple accept=".pdf,.docx,.txt,.xlsx,.csv,.jpg,.png" onchange="handleKBUpload(this)">
+              <div style="font-size:28px;margin-bottom:6px">📄</div>
+              <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:3px;font-family:var(--fh)">Upload Business Documents</div>
+              <div style="font-size:11px;color:var(--text3)">PDF, DOCX, TXT, Excel, CSV, Images · Price lists, FAQs, catalogs, menus</div>
+            </div>
+            <div id="kb-files-list">
+              <div class="toggle-row"><div class="toggle-row-info"><div class="toggle-row-label">📄 Price List 2024.pdf</div><div class="toggle-row-sub">Uploaded · 2.3 MB · Active</div></div><button class="btn btn-ghost" style="padding:3px 8px;font-size:11px" onclick="showToast('🗑️ File removed')">Remove</button></div>
+              <div class="toggle-row"><div class="toggle-row-info"><div class="toggle-row-label">📋 Product FAQ.docx</div><div class="toggle-row-sub">Uploaded · 0.8 MB · Active</div></div><button class="btn btn-ghost" style="padding:3px 8px;font-size:11px" onclick="showToast('🗑️ File removed')">Remove</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ ANALYTICS -->
+    <div class="page" id="analytics">
+      <div class="section-title">Analytics</div>
+      <div class="section-sub">Performance insights · Track AI effectiveness · Conversion metrics</div>
+      <div class="kpi-grid" style="margin-bottom:18px">
+        <div class="kpi"><div class="kpi-icon">💬</div><div class="kpi-val">8,429</div><div class="kpi-label">Messages This Week</div><span class="kpi-delta up">▲ 18%</span></div>
+        <div class="kpi"><div class="kpi-icon">🤖</div><div class="kpi-val">91%</div><div class="kpi-label">AI Handled</div><span class="kpi-delta up">▲ 4%</span></div>
+        <div class="kpi"><div class="kpi-icon">📅</div><div class="kpi-val">34</div><div class="kpi-label">Appointments Booked</div><span class="kpi-delta up">▲ 12</span></div>
+        <div class="kpi"><div class="kpi-icon">🎯</div><div class="kpi-val">22%</div><div class="kpi-label">Conversion Rate</div><span class="kpi-delta up">▲ 3%</span></div>
+      </div>
+      <div class="analytics-grid">
+        <div class="card">
+          <div class="card-head"><div class="card-title">📊 Daily Messages (Last 30 Days)</div></div>
+          <div class="chart-container" id="analytics-chart"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div class="card-title">⚡ Response Times</div></div>
+          <div class="resp-time-row"><span class="resp-time-label">Average AI Response</span><span class="resp-time-val">1.8s</span></div>
+          <div class="resp-time-row"><span class="resp-time-label">Fastest Response</span><span class="resp-time-val">0.4s</span></div>
+          <div class="resp-time-row"><span class="resp-time-label">Slowest Response</span><span class="resp-time-val">8.2s</span></div>
+          <div class="resp-time-row"><span class="resp-time-label">After-Hours Handled</span><span class="resp-time-val">89%</span></div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-head"><div class="card-title">🏆 Top Contacts by Messages</div></div>
+          <div id="top-contacts"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div class="card-title">📱 Numbers Performance</div></div>
+          <div id="model-usage"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ STATUS -->
+    <div class="page" id="status">
+      <div class="section-title">Business Status</div>
+      <div class="section-sub">Post updates · Promotions · Reach all your contacts</div>
+      <div class="status-compose">
+        <div class="card-title" style="margin-bottom:12px">✍️ Compose Status</div>
+        <textarea class="status-input" id="status-input" placeholder="Share a business update, offer, or announcement…" oninput="document.getElementById('sc').textContent=(700-this.value.length)+' left'"></textarea>
+        <div class="status-actions">
+          <button class="btn btn-ghost" onclick="showToast('📸 Media added')">📸 Add Photo</button>
+          <button class="btn btn-ghost" onclick="showToast('🎥 Video added')">🎥 Add Video</button>
+          <button class="btn btn-primary" onclick="postStatus()">Post Status</button>
+          <span class="status-char" id="sc">700 left</span>
+        </div>
+      </div>
+      <div class="prev-statuses">
+        <div class="ps-head">Previous Statuses</div>
+        <div class="ps-item"><div class="ps-bubble">🎉 Diwali Special! Extra 10% off on all TVs today only!</div><div><div class="ps-time">2 hrs ago</div><div class="ps-views">👁️ 1,234 views</div></div></div>
+        <div class="ps-item"><div class="ps-bubble">📦 New Samsung phones arrived! Visit us at MG Road.</div><div><div class="ps-time">Yesterday</div><div class="ps-views">👁️ 892 views</div></div></div>
+        <div class="ps-item"><div class="ps-bubble">🔧 Free AC servicing this weekend for existing customers!</div><div><div class="ps-time">3 days ago</div><div class="ps-views">👁️ 567 views</div></div></div>
+      </div>
+    </div>
+
+    <!-- ══════ SETTINGS -->
+    <div class="page" id="settings">
+      <div class="section-title">Settings</div>
+      <div class="section-sub">Account · Appearance · Notifications</div>
+      <div class="settings-grid">
+        <div class="settings-nav">
+          <div class="sn-item active" onclick="switchSettingsTab('s-account',this)">👤 Account</div>
+          <div class="sn-item" onclick="switchSettingsTab('s-appearance',this)">🎨 Appearance</div>
+          <div class="sn-item" onclick="switchSettingsTab('s-numbers',this)">📱 My Numbers</div>
+          <div class="sn-item" onclick="switchSettingsTab('s-notifications',this)">🔔 Notifications</div>
+          <div class="sn-item" onclick="switchSettingsTab('s-billing',this)">💳 Billing</div>
+          <div class="sn-item" onclick="switchSettingsTab('s-security',this)">🔒 Security</div>
+        </div>
+        <div>
+          <div class="settings-panel active" id="s-account">
+            <div class="card">
+              <div class="card-head"><div class="card-title">👤 Account Info</div></div>
+              <div class="form-grid-2">
+                <div class="form-group"><label class="form-label">Full Name</label><input class="form-input" value="Rahul Sharma"/></div>
+                <div class="form-group"><label class="form-label">Email</label><input class="form-input" value="rahul@sharmaelectronics.in"/></div>
+              </div>
+              <div class="form-group"><label class="form-label">Current Plan</label><input class="form-input" value="Pro Plan · ₹2,999/month" readonly style="color:var(--accent)"/></div>
+              <button class="btn btn-primary" onclick="showToast('✅ Profile updated')">Save Changes</button>
+            </div>
+          </div>
+          <div class="settings-panel" id="s-appearance">
+            <div class="card">
+              <div class="card-head"><div class="card-title">🎨 Colour Theme</div><span style="font-size:11px;color:var(--orange)">Assigned by Admin</span></div>
+              <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Your current theme is set by your service provider. Contact support to request a change.</div>
+              <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px" id="theme-swatches"></div>
+            </div>
+          </div>
+          <div class="settings-panel" id="s-numbers">
+            <div class="card">
+              <div class="card-head"><div class="card-title">📱 Connected Numbers</div><button class="btn btn-primary" style="padding:6px 12px;font-size:12px" onclick="openModal('add-number')">+ Add Number</button></div>
+              <div id="numbers-list"></div>
+            </div>
+          </div>
+          <div class="settings-panel" id="s-notifications">
+            <div class="card">
+              <div class="card-head"><div class="card-title">🔔 Notification Preferences</div></div>
+              <div class="toggle-row"><div class="toggle-row-info"><div class="toggle-row-label">New message alerts</div></div><label class="sw"><input type="checkbox" checked><div class="sw-slider"></div></label></div>
+              <div class="toggle-row"><div class="toggle-row-info"><div class="toggle-row-label">Appointment booked by AI</div></div><label class="sw"><input type="checkbox" checked><div class="sw-slider"></div></label></div>
+              <div class="toggle-row"><div class="toggle-row-info"><div class="toggle-row-label">Campaign completed</div></div><label class="sw"><input type="checkbox" checked><div class="sw-slider"></div></label></div>
+              <div class="toggle-row"><div class="toggle-row-info"><div class="toggle-row-label">Number disconnected</div></div><label class="sw"><input type="checkbox" checked><div class="sw-slider"></div></label></div>
+            </div>
+          </div>
+          <div class="settings-panel" id="s-billing">
+            <div class="card">
+              <div class="card-head"><div class="card-title">💳 Billing</div></div>
+              <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--rs);padding:14px;margin-bottom:14px">
+                <div style="font-family:var(--fh);font-size:15px;font-weight:800;color:var(--accent)">Pro Plan</div>
+                <div style="font-size:12px;color:var(--text2);margin-top:3px">₹2,999 / month · Renews Dec 1, 2024</div>
+                <div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-ghost" onclick="showToast('🔄 Redirecting to upgrade...')">Upgrade Plan</button><button class="btn btn-ghost" onclick="showToast('📧 Invoice sent to email')">Download Invoice</button></div>
+              </div>
+            </div>
+          </div>
+          <div class="settings-panel" id="s-security">
+            <div class="card">
+              <div class="card-head"><div class="card-title">🔒 Security</div></div>
+              <div class="form-group"><label class="form-label">Change Password</label><input class="form-input" type="password" placeholder="New password"/></div>
+              <div class="toggle-row"><div class="toggle-row-info"><div class="toggle-row-label">Two-factor authentication</div><div class="toggle-row-sub">Secure your account with 2FA</div></div><label class="sw"><input type="checkbox"><div class="sw-slider"></div></label></div>
+              <button class="btn btn-primary" style="margin-top:12px" onclick="showToast('✅ Security settings saved')">Save</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<!-- ══════════════════ MODALS -->
+
+<!-- Add Number -->
+<div class="modal-overlay" id="add-number" onclick="closeModal(event,this)">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title">📱 Add WhatsApp Number</div><button class="modal-close" onclick="closeModalById('add-number')">✕</button></div>
+    <div style="text-align:center;padding:20px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--rs);margin-bottom:16px">
+      <div style="font-size:60px;margin-bottom:10px">📲</div>
+      <div style="font-family:var(--fh);font-size:14px;font-weight:800;color:var(--text);margin-bottom:5px">Scan QR Code</div>
+      <div style="font-size:12px;color:var(--text2)">Open WhatsApp → Settings → Linked Devices → Link a Device</div>
+    </div>
+    <div class="form-group"><label class="form-label">Label for this number</label><input class="form-input" placeholder="e.g. Main Line, Support, Seasonal…"/></div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModalById('add-number')">Cancel</button><button class="btn btn-primary" onclick="showToast('📱 Number connected!');closeModalById('add-number')">Connect</button></div>
+  </div>
+</div>
+
+<!-- New Broadcast -->
+<div class="modal-overlay" id="new-broadcast" onclick="closeModal(event,this)">
+  <div class="modal" style="max-width:580px">
+    <div class="modal-head"><div class="modal-title">📣 New Campaign</div><button class="modal-close" onclick="closeModalById('new-broadcast')">✕</button></div>
+    <div class="form-group"><label class="form-label">Campaign Name</label><input class="form-input" placeholder="e.g. Winter Sale 2024"/></div>
+    <div class="form-group"><label class="form-label">Send From Number</label><select class="form-input"><option>+91 98765 43210 (Main)</option><option>+91 91234 56789 (Support)</option></select></div>
+    <div class="form-group"><label class="form-label">Target Audience</label><select class="form-input"><option>All Contacts</option><option>Label: Lead</option><option>Label: Customer</option><option>Label: VIP</option><option>Custom List</option></select></div>
+    <div class="form-group"><label class="form-label">Message</label><textarea class="form-input" rows="4" placeholder="Hi {name}! 🎉 Special offer just for you…"></textarea></div>
+    <div class="form-group"><label class="form-label">Random Message Gap <span class="lbl-badge">Anti-spam</span></label>
+      <div style="display:flex;gap:8px">
+        <div style="flex:1"><label style="font-size:10px;color:var(--text3)">Min delay</label><input class="form-input" type="number" value="15" placeholder="seconds"/></div>
+        <div style="flex:1"><label style="font-size:10px;color:var(--text3)">Max delay</label><input class="form-input" type="number" value="45" placeholder="seconds"/></div>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:4px">⚡ Each message will be sent after a random delay between Min–Max seconds</div>
+    </div>
+    <div class="form-group"><label class="form-label">Schedule</label><input class="form-input" type="datetime-local"/></div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModalById('new-broadcast')">Cancel</button><button class="btn btn-primary" onclick="showToast('✅ Campaign scheduled!');closeModalById('new-broadcast')">Schedule Campaign</button></div>
+  </div>
+</div>
+
+<!-- New Followup -->
+<div class="modal-overlay" id="new-followup" onclick="closeModal(event,this)">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title">🔄 New Follow-up Sequence</div><button class="modal-close" onclick="closeModalById('new-followup')">✕</button></div>
+    <div class="form-group"><label class="form-label">Sequence Name</label><input class="form-input" placeholder="e.g. Post-enquiry Follow-up"/></div>
+    <div class="form-group"><label class="form-label">Trigger</label><select class="form-input"><option>No reply after X days</option><option>Customer says "interested"</option><option>New contact added</option><option>Campaign click</option><option>Custom keyword</option></select></div>
+    <div class="form-group"><label class="form-label">Delay After Trigger</label><div style="display:flex;gap:8px"><input class="form-input" type="number" value="3" style="width:80px"/><select class="form-input"><option>Days</option><option>Hours</option><option>Minutes</option></select></div></div>
+    <div class="form-group"><label class="form-label">Random Gap Between Steps</label>
+      <div style="display:flex;gap:8px">
+        <div style="flex:1"><label style="font-size:10px;color:var(--text3)">Min (sec)</label><input class="form-input" type="number" value="10"/></div>
+        <div style="flex:1"><label style="font-size:10px;color:var(--text3)">Max (sec)</label><input class="form-input" type="number" value="30"/></div>
+      </div>
+    </div>
+    <div class="form-group"><label class="form-label">Follow-up Message</label><textarea class="form-input" rows="3" placeholder="Hi {name}! Just checking in — did you get a chance to check our offer?"></textarea></div>
+    <div class="toggle-row"><div class="toggle-row-info"><div class="toggle-row-label">Stop if customer replies</div><div class="toggle-row-sub">Don't send follow-up if they already responded</div></div><label class="sw"><input type="checkbox" checked><div class="sw-slider"></div></label></div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModalById('new-followup')">Cancel</button><button class="btn btn-primary" onclick="showToast('✅ Follow-up saved!');closeModalById('new-followup')">Save Sequence</button></div>
+  </div>
+</div>
+
+<!-- New Appointment -->
+<div class="modal-overlay" id="new-appointment" onclick="closeModal(event,this)">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title">📅 New Appointment</div><button class="modal-close" onclick="closeModalById('new-appointment')">✕</button></div>
+    <div class="form-group"><label class="form-label">Customer Name</label><input class="form-input" placeholder="Search or type name…"/></div>
+    <div class="form-group"><label class="form-label">Type</label><select class="form-input"><option>Store Visit</option><option>Product Demo</option><option>Service Repair</option><option>Consultation</option><option>Follow-up Call</option></select></div>
+    <div class="form-grid-2">
+      <div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date"/></div>
+      <div class="form-group"><label class="form-label">Time</label><input class="form-input" type="time" value="10:00"/></div>
+    </div>
+    <div class="form-group"><label class="form-label">Notes</label><textarea class="form-input" rows="2" placeholder="Any notes for this appointment…"></textarea></div>
+    <div class="toggle-row"><div class="toggle-row-info"><div class="toggle-row-label">Add to Google Calendar</div></div><label class="sw"><input type="checkbox" checked><div class="sw-slider"></div></label></div>
+    <div class="toggle-row"><div class="toggle-row-info"><div class="toggle-row-label">Send reminder to customer via WhatsApp</div></div><label class="sw"><input type="checkbox" checked><div class="sw-slider"></div></label></div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModalById('new-appointment')">Cancel</button><button class="btn btn-primary" onclick="showToast('📅 Appointment booked & added to calendar!');closeModalById('new-appointment')">Book Appointment</button></div>
+  </div>
+</div>
+
+<!-- Book Appointment from Chat -->
+<div class="modal-overlay" id="book-appointment" onclick="closeModal(event,this)">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title">📅 Book Appointment — Priya Mehta</div><button class="modal-close" onclick="closeModalById('book-appointment')">✕</button></div>
+    <div class="form-group"><label class="form-label">Appointment Type</label><select class="form-input"><option>Store Visit</option><option>Product Demo</option><option>Service Repair</option></select></div>
+    <div class="form-grid-2">
+      <div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date"/></div>
+      <div class="form-group"><label class="form-label">Time</label><input class="form-input" type="time" value="11:00"/></div>
+    </div>
+    <div class="toggle-row"><div class="toggle-row-info"><div class="toggle-row-label">Notify customer via WhatsApp</div></div><label class="sw"><input type="checkbox" checked><div class="sw-slider"></div></label></div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModalById('book-appointment')">Cancel</button><button class="btn btn-primary" onclick="showToast('📅 Appointment booked! Customer notified.');closeModalById('book-appointment')">Confirm Booking</button></div>
+  </div>
+</div>
+
+<!-- Schedule Message -->
+<div class="modal-overlay" id="schedule-msg" onclick="closeModal(event,this)">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title">⏰ Schedule Message</div><button class="modal-close" onclick="closeModalById('schedule-msg')">✕</button></div>
+    <div class="form-group"><label class="form-label">Message</label><textarea class="form-input" rows="3" placeholder="Type scheduled message…"></textarea></div>
+    <div class="form-group"><label class="form-label">Send At</label><input class="form-input" type="datetime-local"/></div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModalById('schedule-msg')">Cancel</button><button class="btn btn-primary" onclick="showToast('⏰ Message scheduled!');closeModalById('schedule-msg')">Schedule</button></div>
+  </div>
+</div>
+
+<!-- Create Poll -->
+<div class="modal-overlay" id="create-poll" onclick="closeModal(event,this)">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title">📊 Create Poll</div><button class="modal-close" onclick="closeModalById('create-poll')">✕</button></div>
+    <div class="form-group"><label class="form-label">Question</label><input class="form-input" placeholder="Ask your question…"/></div>
+    <div id="poll-options-list">
+      <div class="form-group"><label class="form-label">Option 1</label><input class="form-input" placeholder="Option text"/></div>
+      <div class="form-group"><label class="form-label">Option 2</label><input class="form-input" placeholder="Option text"/></div>
+    </div>
+    <button class="btn btn-ghost" style="width:100%;margin-bottom:14px" onclick="addPollOption()">+ Add Option</button>
+    <div class="toggle-row"><div class="toggle-row-info"><div class="toggle-row-label">Allow multiple answers</div></div><label class="sw"><input type="checkbox"><div class="sw-slider"></div></label></div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModalById('create-poll')">Cancel</button><button class="btn btn-primary" onclick="showToast('📊 Poll created and sent!');closeModalById('create-poll')">Send Poll</button></div>
+  </div>
+</div>
+
+<!-- Send Location -->
+<div class="modal-overlay" id="send-location" onclick="closeModal(event,this)">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title">📍 Send Location</div><button class="modal-close" onclick="closeModalById('send-location')">✕</button></div>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--rs);height:150px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;cursor:pointer;flex-direction:column;gap:8px" onclick="showToast('📍 Map opened')"><div style="font-size:36px">🗺️</div><div style="font-size:13px;color:var(--text2)">Click to select on map</div></div>
+    <div class="form-group"><label class="form-label">Business Address</label><input class="form-input" value="Shop No. 12, MG Road, Jaipur, Rajasthan 302001"/></div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModalById('send-location')">Cancel</button><button class="btn btn-primary" onclick="showToast('📍 Location sent!');closeModalById('send-location')">Send</button></div>
+  </div>
+</div>
+
+<!-- Send Contact -->
+<div class="modal-overlay" id="send-contact" onclick="closeModal(event,this)">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title">👤 Send Contact Card</div><button class="modal-close" onclick="closeModalById('send-contact')">✕</button></div>
+    <div class="form-group"><label class="form-label">Search Contact</label><input class="form-input" placeholder="Search by name or phone…"/></div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <div style="display:flex;align-items:center;gap:10px;padding:9px;background:var(--surface2);border-radius:var(--rs);cursor:pointer;border:1px solid var(--border)" onclick="showToast('👤 Contact sent!');closeModalById('send-contact')"><div style="width:32px;height:32px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#000;font-family:var(--fh)">A</div><div><div style="font-size:13px;font-weight:600;font-family:var(--fh)">Amit Kumar</div><div style="font-size:11px;color:var(--text2)">+91 98100 12345</div></div></div>
+      <div style="display:flex;align-items:center;gap:10px;padding:9px;background:var(--surface2);border-radius:var(--rs);cursor:pointer;border:1px solid var(--border)" onclick="showToast('👤 Contact sent!');closeModalById('send-contact')"><div style="width:32px;height:32px;border-radius:50%;background:var(--cyan);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#000;font-family:var(--fh)">R</div><div><div style="font-size:13px;font-weight:600;font-family:var(--fh)">Riya Singh</div><div style="font-size:11px;color:var(--text2)">+91 91234 56789</div></div></div>
+    </div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModalById('send-contact')">Cancel</button></div>
+  </div>
+</div>
+
+<!-- Add Contact -->
+<div class="modal-overlay" id="add-contact" onclick="closeModal(event,this)">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title">👤 Add Contact</div><button class="modal-close" onclick="closeModalById('add-contact')">✕</button></div>
+    <div class="form-grid-2">
+      <div class="form-group"><label class="form-label">Name <span class="req">*</span></label><input class="form-input" placeholder="Full name"/></div>
+      <div class="form-group"><label class="form-label">Phone <span class="req">*</span></label><input class="form-input" placeholder="+91 XXXXX XXXXX"/></div>
+    </div>
+    <div class="form-group"><label class="form-label">Label</label><select class="form-input"><option>Lead</option><option>Customer</option><option>VIP</option><option>Prospect</option></select></div>
+    <div class="form-group"><label class="form-label">Notes</label><textarea class="form-input" rows="2" placeholder="Any notes…"></textarea></div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModalById('add-contact')">Cancel</button><button class="btn btn-primary" onclick="showToast('✅ Contact added!');closeModalById('add-contact')">Add Contact</button></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"><span class="toast-icon" id="toast-icon">✅</span><span id="toast-msg"></span></div>
+
+<script>
+// ═══ DATA
+const CONTACTS=[
+  {name:'Priya Mehta',phone:'+91 98765 43210',label:'Lead',last:'2 min ago',color:'#00E676',init:'P'},
+  {name:'Ravi Kumar',phone:'+91 91234 56789',label:'Customer',last:'18 min ago',color:'#00BCD4',init:'R'},
+  {name:'Anita Singh',phone:'+91 98100 11223',label:'VIP',last:'1 hr ago',color:'#9C6FFF',init:'A'},
+  {name:'Suresh Patel',phone:'+91 99876 54321',label:'Prospect',last:'Yesterday',color:'#FF8F00',init:'S'},
+  {name:'Kavita Rao',phone:'+91 98000 12345',label:'Customer',last:'Yesterday',color:'#FF6BCB',init:'K'},
+  {name:'Deepak Joshi',phone:'+91 87654 32109',label:'Lead',last:'2 days ago',color:'#00E676',init:'D'},
+];
+const CHATS=[
+  {name:'Priya Mehta',preview:'AI: Samsung 65" QLED available ✓',time:'2m',unread:3,ai:true,color:'#00E676',init:'P',num:'43210'},
+  {name:'Ravi Kumar',preview:'Thanks for the info! Will visit...',time:'18m',unread:1,ai:true,color:'#00BCD4',init:'R',num:'56789'},
+  {name:'Sharma Family Group',preview:'You: Welcome to our VIP group!',time:'1h',unread:0,ai:false,color:'#9C6FFF',init:'S',muted:true,num:'43210'},
+  {name:'Anita Singh',preview:'🔊 Audio message',time:'2h',unread:0,ai:true,color:'#FF6BCB',init:'A',num:'56789'},
+  {name:'Suresh Patel',preview:'📍 Location shared',time:'3h',unread:2,ai:false,color:'#FF8F00',init:'S',num:'43210'},
+  {name:'Deepak Joshi',preview:'AI: Your order is confirmed ✓',time:'5h',unread:0,ai:true,color:'#00E676',init:'D',num:'11223'},
+];
+const CAMPAIGNS=[
+  {name:'Diwali Sale 2024',desc:'Special discounts on all electronics for Diwali.',status:'active',statusLabel:'Live',sent:342,opened:287,replied:94,date:'Nov 1'},
+  {name:'Post-Purchase Follow-up',desc:'Thank customers and ask for reviews after purchase.',status:'active',statusLabel:'Live',sent:189,opened:171,replied:43,date:'Oct 28'},
+  {name:'Navratri Offers',desc:'Festival offers for Navratri season. Completed.',status:'completed',statusLabel:'Done',sent:512,opened:398,replied:112,date:'Oct 15'},
+];
+const FOLLOWUPS=[
+  {name:'No-reply Follow-up',trigger:'No reply after 3 days',delay:'3 days',contacts:234,sent:89,on:true},
+  {name:'Post-Visit Nurture',trigger:'Customer visited store',delay:'1 day',contacts:67,sent:45,on:true},
+  {name:'Cart Abandon',trigger:'Enquired but no purchase',delay:'6 hours',contacts:123,sent:0,on:false},
+  {name:'Review Request',trigger:'After purchase confirmed',delay:'2 days',contacts:890,sent:712,on:true},
+];
+const HOURS=[
+  {day:'Mon',time:'9:00 AM – 7:00 PM',on:true},{day:'Tue',time:'9:00 AM – 7:00 PM',on:true},
+  {day:'Wed',time:'9:00 AM – 7:00 PM',on:true},{day:'Thu',time:'9:00 AM – 7:00 PM',on:true},
+  {day:'Fri',time:'9:00 AM – 7:00 PM',on:true},{day:'Sat',time:'10:00 AM – 5:00 PM',on:true},
+  {day:'Sun',time:'Closed',on:false},
+];
+const NUMBERS=[
+  {num:'+91 98765 43210',label:'Main Line',status:'connected'},
+  {num:'+91 91234 56789',label:'Support',status:'connected'},
+  {num:'+91 99000 11223',label:'Seasonal',status:'paused'},
+];
+const UPCOMING_APPTS=[
+  {day:15,mon:'Dec',title:'Store Visit – Priya Mehta',sub:'11:00 AM · Product demo',type:'booking'},
+  {day:16,mon:'Dec',title:'Follow-up Call – Ravi Kumar',sub:'3:00 PM · Post-purchase',type:'followup'},
+  {day:17,mon:'Dec',title:'Repair Pickup – Anita Singh',sub:'10:30 AM · AC Service',type:'booking'},
+  {day:18,mon:'Dec',title:'Monthly Review Reminder',sub:'End of week wrap-up',type:'reminder'},
+];
+const AI_BOOKINGS=[
+  {name:'Priya Mehta',type:'Store Visit',time:'Dec 15, 11 AM',chat:true},
+  {name:'Suresh Patel',type:'Product Demo',time:'Dec 15, 2 PM',chat:true},
+  {name:'Rahul Verma',type:'Service Repair',time:'Dec 16, 10 AM',chat:true},
+];
+const TODAY_APPTS=[
+  {time:'11:00 AM',name:'Priya Mehta',type:'Store Visit',ai:true},
+  {time:'2:00 PM',name:'Suresh Patel',type:'Product Demo',ai:true},
+  {time:'4:30 PM',name:'Rahul Verma',type:'Service Repair',ai:false},
+];
+
+// ═══ NAVIGATION
+const titles={overview:'Overview',inbox:'Inbox','inbox-page':'Inbox',contacts:'Contacts',calendar:'Calendar',campaigns:'Campaigns',followups:'Follow-ups','ai-agent':'AI Agent',analytics:'Analytics',status:'Status',settings:'Settings'};
+const subs={overview:'Good morning, Rahul 👋','inbox-page':'All conversations',contacts:'1,284 contacts synced',calendar:'Appointments & bookings',campaigns:'Campaigns & follow-up sequences',followups:'Automated sequences','ai-agent':'Configure your AI assistant',analytics:'Performance insights',status:'Business status updates',settings:'Account & preferences'};
+function navigate(id,el){
+  const realId = id==='inbox'?'inbox-page':id;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  const pg = document.getElementById(realId);
+  if(pg) pg.classList.add('active');
+  if(el) el.classList.add('active');
+  document.getElementById('tb-title').textContent=titles[id]||titles[realId]||id;
+  document.getElementById('tb-sub').textContent=subs[id]||subs[realId]||'';
+}
+function switchTab(el,label){
+  el.closest('.cl-tabs').querySelectorAll('.cl-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  showToast('🔍 Filtered: '+label);
+}
+function switchSettingsTab(id,el){
+  document.querySelectorAll('.settings-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.sn-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  el.classList.add('active');
+}
+
+// ═══ NUMBER SWITCHER
+function toggleNumSwitcher(){
+  const dd=document.getElementById('ns-dropdown');
+  const ch=document.getElementById('ns-chevron');
+  dd.classList.toggle('open');
+  ch.classList.toggle('open');
+}
+function switchNumber(el,num){
+  document.querySelectorAll('.ns-option').forEach(o=>o.classList.remove('active'));
+  el.classList.add('active');
+  showToast('📱 Switched to: '+num);
+}
+function filterNum(el,num){
+  document.querySelectorAll('.nf-chip').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  showToast('📱 Showing: '+(num==='all'?'All Numbers':'+91 XX'+num));
+}
+
+// ═══ RENDER
+function renderChatList(){
+  const el=document.getElementById('chat-list');
+  if(!el)return;
+  el.innerHTML=CHATS.map((c,i)=>`
+    <div class="ci ${i===0?'active':''}" onclick="selectChat(this,${i})">
+      <div class="ci-av" style="background:${c.color}">${c.init}</div>
+      <div class="ci-info">
+        <div class="ci-name">${c.name}${c.muted?'<span class="ci-muted">🔇</span>':''}<span class="ci-time">${c.time}</span></div>
+        <div class="ci-preview"><span>${c.preview}</span><div style="display:flex;gap:4px;align-items:center;flex-shrink:0">${c.unread?`<span class="ci-unread">${c.unread}</span>`:''}<span class="ci-ai-chip ${c.ai?'':'off'}">${c.ai?'AI':'Human'}</span><span class="ci-num-tag">·${c.num}</span></div></div>
+      </div>
+    </div>`).join('');
+}
+function selectChat(el,i){
+  document.querySelectorAll('.ci').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  const c=CHATS[i];
+  document.getElementById('cp-av').textContent=c.init;
+  document.getElementById('cp-av').style.background=c.color;
+  document.getElementById('cp-name').innerHTML=c.name+(c.ai?' <span class="badge green">AI Active</span>':'<span class="badge gray">Human</span>');
+  document.getElementById('cp-status').innerHTML='🟢 Online · '+c.time+' · <span style="color:var(--cyan);font-size:10px">·'+c.num+'</span>';
+}
+function renderMsgs(){
+  const msgs=[
+    {type:'system',text:'Today'},
+    {type:'in',text:'Hello! Kya aapke paas Samsung 65" TV available hai?',time:'10:32 AM'},
+    {type:'out',text:'Bilkul! 😊 Sharma Electronics mein Samsung 65" QLED TV available hai. Current price ₹89,999 hai aur Diwali offer mein 10% discount ke saath ₹80,999 mein milega! 🎉',time:'10:32 AM',ai:true},
+    {type:'in',text:'Wow that sounds great! Kya delivery hogi?',time:'10:34 AM'},
+    {type:'out',text:'Haan bilkul! Free delivery available hai Jaipur mein. Installation bhi free hai. 🚚',time:'10:34 AM',ai:true,react:['👍 2','❤️ 1']},
+    {type:'in',text:'Store visit book kar sakte hain kya?',time:'10:38 AM'},
+    {type:'out',text:'Zaroor! 📅 Kaunsi date aur time suit karega aapko? Main Google Calendar mein immediately confirm kar dunga.',time:'10:38 AM',ai:true},
+    {type:'in',text:'15 December 11 baje?',time:'10:39 AM'},
+    {type:'out',text:'✅ Done! Dec 15 at 11:00 AM — store visit confirmed and added to calendar. Reminder bhi aayega aapko WhatsApp pe. 🎉',time:'10:39 AM',ai:true},
+  ];
+  const el=document.getElementById('msgs');
+  if(!el)return;
+  el.innerHTML=msgs.map(m=>{
+    if(m.type==='system') return `<div class="system-msg">${m.text}</div>`;
+    const react=m.react?`<div class="msg-react">${m.react.map(r=>`<span>${r}</span>`).join('')}</div>`:'';
+    const aiTag=m.ai?`<span class="ai-sent-tag">AI</span>`:'';
+    if(m.type==='out') return `<div class="msg-row out"><div class="msg-bubble">${m.text}</div>${react}<div class="msg-meta">${m.time} ${aiTag}</div></div>`;
+    return `<div class="msg-row in"><div class="msg-bubble">${m.text}</div><div class="msg-meta">${m.time}</div></div>`;
+  }).join('');
+  el.scrollTop=el.scrollHeight;
+}
+function renderCampaigns(){
+  const el=document.getElementById('camp-grid');
+  if(!el)return;
+  const statusColor={active:'green',completed:'blue',scheduled:'orange'};
+  el.innerHTML=CAMPAIGNS.map(c=>`
+    <div class="camp-card">
+      <div class="cc-status-row"><span class="badge ${statusColor[c.status]||'gray'}"><span class="pill-dot"></span>${c.statusLabel}</span></div>
+      <div class="cc-name">${c.name}</div>
+      <div class="cc-desc">${c.desc}</div>
+      <div class="cc-stats">
+        <div class="cc-stat"><div class="cc-stat-val">${c.sent}</div><div class="cc-stat-label">Sent</div></div>
+        <div class="cc-stat"><div class="cc-stat-val">${c.opened}</div><div class="cc-stat-label">Opened</div></div>
+        <div class="cc-stat"><div class="cc-stat-val">${c.replied}</div><div class="cc-stat-label">Replied</div></div>
+      </div>
+      <div class="cc-footer"><span class="cc-date">${c.date}</span><div class="cc-actions"><button class="cc-btn" onclick="showToast('✏️ Editing...')">Edit</button><button class="cc-btn" onclick="showToast('📊 Stats')">Stats</button></div></div>
+    </div>`).join('')+`<div class="new-camp" onclick="openModal('new-broadcast')"><div class="new-camp-plus">＋</div><div class="new-camp-text">New Campaign</div></div>`;
+}
+function renderFollowups(id){
+  const el=document.getElementById(id);
+  if(!el)return;
+  el.innerHTML=FOLLOWUPS.map(f=>`
+    <div class="fu-row">
+      <div class="fu-name">${f.name}</div>
+      <div class="fu-trigger-type">${f.trigger}</div>
+      <div class="fu-delay">${f.delay}</div>
+      <div class="fu-contacts">${f.contacts}</div>
+      <div class="fu-sent">${f.sent}</div>
+      <div class="fu-row-actions"><label class="sw" style="margin-right:4px"><input type="checkbox" ${f.on?'checked':''}><div class="sw-slider"></div></label><button class="fu-act-btn" onclick="showToast('✏️ Editing...')">Edit</button></div>
+    </div>`).join('');
+}
+function renderHours(){
+  const el=document.getElementById('hrs-table');
+  if(!el)return;
+  el.innerHTML=HOURS.map(h=>`
+    <div class="hrs-row">
+      <div class="hrs-day">${h.day}</div>
+      <div class="hrs-time">${h.time}</div>
+      <label class="sw"><input type="checkbox" ${h.on?'checked':''}><div class="sw-slider"></div></label>
+    </div>`).join('');
+}
+function renderContacts(){
+  const el=document.getElementById('contacts-body');
+  if(!el)return;
+  el.innerHTML=CONTACTS.map(c=>`
+    <div class="ct-row">
+      <div><input type="checkbox" class="ct-checkbox"></div>
+      <div class="ct-name-cell"><div class="ct-av" style="background:${c.color}">${c.init}</div><div><div class="ct-name">${c.name}</div><div class="ct-phone">${c.phone}</div></div></div>
+      <div class="ct-phone">${c.phone}</div>
+      <div class="ct-label"><span class="badge ${c.label==='VIP'?'purple':c.label==='Lead'?'blue':'green'}">${c.label}</span></div>
+      <div class="ct-last">${c.last}</div>
+      <div class="ct-row-acts"><button class="ct-act" onclick="showToast('💬 Opening chat')">Chat</button><button class="ct-act" onclick="showToast('✏️ Edit contact')">Edit</button></div>
+    </div>`).join('');
+}
+function renderOvChart(){
+  const el=document.getElementById('ov-chart');
+  const lb=document.getElementById('ov-labels');
+  if(!el)return;
+  const vals=[940,820,1080,980,1150,1100,1284];
+  const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const max=Math.max(...vals);
+  el.innerHTML=vals.map((v,i)=>`<div class="bar ${i===6?'hi':''}" style="height:${(v/max)*100}%" title="${days[i]}: ${v}" onclick="showToast('📊 ${days[i]}: ${v} messages')"></div>`).join('');
+  lb.innerHTML=days.map(d=>`<div class="chart-label">${d}</div>`).join('');
+}
+function renderTopContacts(){
+  const el=document.getElementById('top-contacts');
+  if(!el)return;
+  const data=[{name:'Priya Mehta',msgs:47,color:'#00E676',init:'P'},{name:'Ravi Kumar',msgs:38,color:'#00BCD4',init:'R'},{name:'Anita Singh',msgs:29,color:'#9C6FFF',init:'A'},{name:'Suresh Patel',msgs:21,color:'#FF8F00',init:'S'},{name:'Kavita Rao',msgs:18,color:'#FF6BCB',init:'K'}];
+  el.innerHTML=data.map((c,i)=>`<div class="top-chat-row"><div class="tc-rank">#${i+1}</div><div class="tc-av" style="background:${c.color}">${c.init}</div><div class="tc-name">${c.name}</div><div class="tc-msgs">${c.msgs} msgs</div><div class="tc-bar-wrap"><div class="tc-bar" style="width:${(c.msgs/47)*100}%"></div></div></div>`).join('');
+}
+function renderNumberPerf(){
+  const el=document.getElementById('model-usage');
+  if(!el)return;
+  const data=[{name:'·43210 (Main)',pct:58,color:'var(--accent)'},{name:'·56789 (Support)',pct:31,color:'var(--cyan)'},{name:'·11223 (Seasonal)',pct:11,color:'var(--orange)'}];
+  el.innerHTML=data.map(m=>`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px"><span style="color:var(--text)">${m.name}</span><span style="color:var(--text2);font-weight:700;font-family:var(--fh)">${m.pct}%</span></div><div style="height:6px;background:var(--surface3);border-radius:3px;overflow:hidden"><div style="height:100%;width:${m.pct}%;background:${m.color};border-radius:3px;transition:.5s"></div></div></div>`).join('');
+}
+function renderThemes(){
+  const el=document.getElementById('theme-swatches');
+  if(!el)return;
+  const themes=[{name:'Dark Green',c:'#00E676'},{name:'Ocean Blue',c:'#0288D1'},{name:'Royal Purple',c:'#9C6FFF'},{name:'Sunset Orange',c:'#FF8F00'},{name:'Hot Pink',c:'#FF6BCB'}];
+  el.innerHTML=themes.map((t,i)=>`<div style="aspect-ratio:1;border-radius:8px;background:${t.c};cursor:pointer;border:${i===0?'3px solid white':'2px solid transparent'};transition:.2s;opacity:${i===0?1:0.5}" onclick="showToast('🎨 Theme set by Admin. Contact support to change.')" title="${t.name}"></div>`).join('');
+}
+function renderAnalyticsChart(){
+  const el=document.getElementById('analytics-chart');
+  if(!el)return;
+  const vals=[120,145,98,167,210,188,230,175,260,195,240,280,190,320,290,210,350,280,310,260,340,290,380,310,360,280,420,350,390,410];
+  const max=Math.max(...vals);
+  el.innerHTML=vals.map((v,i)=>`<div class="a-bar" style="height:${(v/max)*130}px;background:${i>=25?'var(--accent-dim)':'var(--surface3)'}"><div class="bar-tip">${v}</div><div class="a-bar-label">${i+1}</div></div>`).join('');
+}
+function renderCalendar(){
+  const labels=document.getElementById('cal-day-labels');
+  const grid=document.getElementById('cal-grid');
+  if(!labels||!grid)return;
+  const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  labels.innerHTML=days.map(d=>`<div class="cal-day-label">${d}</div>`).join('');
+  const year=2024,month=11;
+  const firstDay=new Date(year,month,1).getDay();
+  const daysInMonth=new Date(year,month+1,0).getDate();
+  const daysInPrev=new Date(year,month,0).getDate();
+  const events={5:[{t:'booking',l:'Priya - TV Demo'}],8:[{t:'followup',l:'Follow-up x3'}],12:[{t:'reminder',l:'Monthly Review'}],15:[{t:'booking',l:'Store Visit'},{t:'booking',l:'Product Demo'}],16:[{t:'followup',l:'Follow-up Call'}],18:[{t:'reminder',l:'Team Check-in'}],22:[{t:'booking',l:'Repair Pickup'}]};
+  let cells='';
+  for(let i=0;i<firstDay;i++) cells+=`<div class="cal-cell other-month"><div class="cal-date">${daysInPrev-firstDay+i+1}</div></div>`;
+  for(let d=1;d<=daysInMonth;d++){
+    const isToday=d===15;
+    const evs=events[d]||[];
+    cells+=`<div class="cal-cell ${isToday?'today':''}" onclick="showToast('📅 Dec ${d}${evs.length?' — '+evs.length+' event(s)':''}')">
+      <div class="cal-date">${d}</div>
+      ${evs.map(e=>`<div class="cal-event ${e.t}">${e.l}</div>`).join('')}
+    </div>`;
+  }
+  grid.innerHTML=cells;
+}
+function renderUpcoming(){
+  const el=document.getElementById('upcoming-list');
+  if(!el)return;
+  el.innerHTML=UPCOMING_APPTS.map(a=>`
+    <div class="upcoming-item">
+      <div class="up-date-block"><div class="up-day">${a.day}</div><div class="up-mon">${a.mon}</div></div>
+      <div class="up-info">
+        <div class="up-title">${a.title}</div>
+        <div class="up-sub">${a.sub}</div>
+      </div>
+      <span class="up-type ${a.type}">${a.type==='booking'?'📅 Booking':a.type==='followup'?'🔄 Follow-up':'🔔 Reminder'}</span>
+    </div>`).join('');
+}
+function renderAIBookings(){
+  const el=document.getElementById('ai-bookings-list');
+  if(!el)return;
+  el.innerHTML=AI_BOOKINGS.map(b=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--surface2);border-radius:var(--rs)">
+      <span style="font-size:14px">📅</span>
+      <div style="flex:1"><div style="font-size:12px;font-weight:700;color:var(--text);font-family:var(--fh)">${b.name}</div><div style="font-size:11px;color:var(--text2)">${b.type} · ${b.time}</div></div>
+      <span style="font-size:9px;padding:2px 5px;border-radius:3px;background:rgba(0,230,118,.12);color:var(--accent);font-weight:700;font-family:var(--fh)">AI Booked</span>
+    </div>`).join('');
+}
+function renderTodayAppts(){
+  const el=document.getElementById('today-appts');
+  if(!el)return;
+  el.innerHTML=TODAY_APPTS.map(a=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)">
+      <div style="width:52px;font-size:11px;font-weight:700;color:var(--accent);font-family:var(--fh);flex-shrink:0">${a.time}</div>
+      <div style="flex:1"><div style="font-size:12.5px;font-weight:700;color:var(--text);font-family:var(--fh)">${a.name}</div><div style="font-size:11px;color:var(--text2)">${a.type}</div></div>
+      ${a.ai?`<span style="font-size:9px;padding:2px 5px;border-radius:3px;background:rgba(0,188,212,.12);color:var(--cyan);font-weight:700;font-family:var(--fh)">AI</span>`:''}
+    </div>`).join('');
+}
+function renderNumbers(){
+  const el=document.getElementById('numbers-list');
+  if(!el)return;
+  el.innerHTML=NUMBERS.map(n=>`
+    <div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--rs);margin-bottom:8px">
+      <div style="width:8px;height:8px;border-radius:50%;background:${n.status==='connected'?'var(--accent)':'var(--text3)'};box-shadow:${n.status==='connected'?'0 0 8px var(--accent)':'none'}"></div>
+      <div style="flex:1"><div style="font-size:13px;font-weight:700;color:var(--text);font-family:var(--fh)">${n.num}</div><div style="font-size:11px;color:var(--text2)">${n.label} · ${n.status}</div></div>
+      <button class="btn btn-ghost" style="padding:4px 10px;font-size:11px" onclick="showToast('🔄 Reconnecting...')">${n.status==='connected'?'Disconnect':'Reconnect'}</button>
+    </div>`).join('');
+}
+
+// ═══ CALENDAR
+let calOffset=0;
+function changeCalMonth(dir){calOffset+=dir;renderCalendar();}
+function connectGCal(){
+  document.getElementById('cal-connect-banner').innerHTML=`<div class="cal-connect-icon">✅</div><div><div class="cal-connect-title" style="color:var(--accent)">Google Calendar Connected!</div><div class="cal-connect-sub">your-email@gmail.com · AI can now book appointments automatically.</div></div><button class="cal-connect-btn" style="background:var(--surface2);color:var(--text2);border:1px solid var(--border)" onclick="showToast('📅 Opening Google Calendar settings')">Manage</button>`;
+  showToast('✅ Google Calendar connected successfully!');
+}
+
+// ═══ INTERACTIONS
+function sendMessage(){
+  const ta=document.getElementById('chat-ta');
+  const text=ta.value.trim();
+  if(!text)return;
+  const msgs=document.getElementById('msgs');
+  const now=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  const el=document.createElement('div');
+  el.className='msg-row out';
+  el.innerHTML=`<div class="msg-bubble">${text}</div><div class="msg-meta">${now}</div>`;
+  msgs.appendChild(el);
+  ta.value='';ta.style.height='auto';
+  msgs.scrollTop=msgs.scrollHeight;
+  showToast('✅ Message sent');
+}
+function useAISuggestion(){
+  const ta=document.getElementById('chat-ta');
+  ta.value='The Samsung 65" QLED is in stock at ₹89,999. With 10% Diwali discount it\'s ₹80,999. Would you like me to send more details or book a store visit?';
+  autoResize(ta);
+  showToast('📋 AI suggestion copied to input');
+}
+function handleKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}}
+function autoResize(ta){ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight,120)+'px';}
+function toggleAIForChat(btn){
+  const on=btn.classList.contains('ai-on');
+  btn.textContent=on?'🤖 AI Off':'🤖 AI On';
+  btn.classList.toggle('ai-on',!on);
+  showToast(on?'⏸️ AI paused for this chat':'🤖 AI enabled for this chat');
+}
+function postStatus(){
+  const t=document.getElementById('status-input').value.trim();
+  if(!t){showToast('⚠️ Write something first!');return;}
+  showToast('✅ Status posted successfully!');
+  document.getElementById('status-input').value='';
+  document.getElementById('sc').textContent='700 left';
+}
+function addPollOption(){
+  const list=document.getElementById('poll-options-list');
+  const count=list.children.length+1;
+  const div=document.createElement('div');
+  div.className='form-group';
+  div.innerHTML=`<label class="form-label">Option ${count}</label><input class="form-input" placeholder="Option text"/>`;
+  list.appendChild(div);
+}
+function handleKBUpload(input){
+  if(input.files.length){
+    const list=document.getElementById('kb-files-list');
+    Array.from(input.files).forEach(f=>{
+      const div=document.createElement('div');
+      div.className='toggle-row';
+      div.innerHTML=`<div class="toggle-row-info"><div class="toggle-row-label">📄 ${f.name}</div><div class="toggle-row-sub">Uploading · ${(f.size/1024/1024).toFixed(1)} MB</div></div><button class="btn btn-ghost" style="padding:3px 8px;font-size:11px" onclick="this.closest('.toggle-row').remove();showToast('🗑️ Removed')">Remove</button>`;
+      list.appendChild(div);
+    });
+    showToast('✅ '+input.files.length+' file(s) uploaded!');
+  }
+}
+
+// ═══ MODALS
+function openModal(id){document.getElementById(id)?.classList.add('open');}
+function closeModalById(id){document.getElementById(id)?.classList.remove('open');}
+function closeModal(e,overlay){if(e.target===overlay)overlay.classList.remove('open');}
+
+// ═══ TOAST
+let toastTimer;
+function showToast(msg){
+  const t=document.getElementById('toast');
+  const icon=msg.match(/^([\u{1F000}-\u{1FFFF}]|[\u2600-\u27FF])/u);
+  document.getElementById('toast-icon').textContent=icon?icon[0]:'✅';
+  document.getElementById('toast-msg').textContent=icon?msg.slice(icon[0].length).trim():msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+// ═══ INIT
+function init(){
+  renderChatList();
+  renderMsgs();
+  renderCampaigns();
+  renderFollowups('fu-rows');
+  renderFollowups('fu-rows-2');
+  renderHours();
+  renderContacts();
+  renderOvChart();
+  renderTopContacts();
+  renderNumberPerf();
+  renderThemes();
+  renderAnalyticsChart();
+  renderCalendar();
+  renderUpcoming();
+  renderAIBookings();
+  renderTodayAppts();
+  renderNumbers();
+}
+init();
+</script>
+</body>
+</html>
