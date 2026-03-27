@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext'
 const SOCKET_URL =
   import.meta.env.VITE_SOCKET_URL?.replace(/\/$/, '') || 'http://localhost:5000'
 
-export const useSocket = (enabled = true) => {
+export const useSocket = (shouldConnect = true) => {
   const { tokens } = useAuth()
   const [socket, setSocket] = useState(null)
   const [connected, setConnected] = useState(false)
@@ -13,11 +13,13 @@ export const useSocket = (enabled = true) => {
   const authToken = tokens?.accessToken
 
   useEffect(() => {
-    if (!enabled || !authToken) {
-      if (socket) socket.disconnect()
-      setSocket(null)
+    if (!shouldConnect || !authToken) {
+      setSocket((curr) => {
+        if (curr) curr.disconnect()
+        return null
+      })
       setConnected(false)
-      return
+      return () => {}
     }
 
     const client = io(SOCKET_URL, {
@@ -33,7 +35,7 @@ export const useSocket = (enabled = true) => {
     return () => {
       client.disconnect()
     }
-  }, [enabled, authToken])
+  }, [shouldConnect, authToken])
 
   return useMemo(
     () => ({

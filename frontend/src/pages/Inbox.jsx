@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 import dayjs from 'dayjs'
+import relativeTime from 'dayjs/plugin/relativeTime'
 import { useAuth } from '../context/AuthContext'
 import { useSocket } from '../hooks/useSocket'
+
+dayjs.extend(relativeTime)
 
 export const InboxPage = () => {
   const { api } = useAuth()
@@ -119,7 +122,7 @@ export const InboxPage = () => {
                       {c.aiEnabled && <span className="ci-num-tag">AI</span>}
                     </span>
                     <span className="ci-time">
-                      {c.lastMessageAt ? dayjs(c.lastMessageAt).fromNow?.() || c.lastMessageAt : ''}
+                      {c.lastMessageAt ? dayjs(c.lastMessageAt).fromNow() : ''}
                     </span>
                   </div>
                   <div className="ci-preview">

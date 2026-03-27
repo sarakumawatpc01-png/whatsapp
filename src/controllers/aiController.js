@@ -1,6 +1,7 @@
 // src/controllers/aiController.js
 const prisma  = require('../config/database');
 const path    = require('path');
+const ExcelJS = require('exceljs');
 const { AppError, ValidationError } = require('../utils/errors');
 const { success } = require('../utils/response');
 const { cacheDel } = require('../config/redis');
@@ -228,10 +229,20 @@ async function extractText(file) {
     }
 
     if (mime.includes('spreadsheet') || mime.includes('excel')) {
-      const XLSX = require('xlsx');
-      const wb   = XLSX.read(file.buffer, { type: 'buffer' });
-      const text = wb.SheetNames.map(n => XLSX.utils.sheet_to_txt(wb.Sheets[n])).join('\n');
-      return text.slice(0, 50000);
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(file.buffer);
+
+      const parts = [];
+      workbook.eachSheet((sheet) => {
+        sheet.eachRow((row) => {
+          const values = row.values
+            .filter((v) => v !== null && v !== undefined && v !== '')
+            .map((v) => (typeof v === 'object' && v.text ? v.text : String(v)));
+          if (values.length) parts.push(values.join(' '));
+        });
+      });
+
+      return parts.join('\n').slice(0, 50000);
     }
 
     return null; // Unsupported format — store without indexing

@@ -30,6 +30,14 @@ export const AuthProvider = ({ children }) => {
 
   const persist = useCallback(
     (nextTokens, nextRole, nextProfile) => {
+      if (!nextTokens) {
+        localStorage.removeItem(storageKey)
+        setTokens(null)
+        setRole(nextRole ?? null)
+        setProfile(nextProfile ?? null)
+        return
+      }
+
       const payload = {
         tokens: nextTokens,
         role: nextRole ?? role,
@@ -44,11 +52,8 @@ export const AuthProvider = ({ children }) => {
   )
 
   const logout = useCallback(() => {
-    localStorage.removeItem(storageKey)
-    setTokens(null)
-    setRole(null)
-    setProfile(null)
-  }, [])
+    persist(null, null, null)
+  }, [persist])
 
   const api = useMemo(
     () =>
@@ -138,10 +143,6 @@ export const AuthProvider = ({ children }) => {
     },
     [persist],
   )
-
-  useEffect(() => {
-    // no-op hydration
-  }, [])
 
   return (
     <AuthContext.Provider

@@ -124,7 +124,12 @@ export const ContactsPage = () => {
           <div className="status-actions">
             <label className="btn btn-ghost" style={{ cursor: 'pointer' }}>
               Upload CSV/Excel
-              <input type="file" accept=".csv, application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden onChange={handleImport} />
+              <input
+                type="file"
+                accept=".csv, application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                hidden
+                onChange={handleImport}
+              />
             </label>
             <button className="btn btn-primary" onClick={handleExport} disabled={importing}>
               {importing ? 'Importing...' : 'Export contacts'}
