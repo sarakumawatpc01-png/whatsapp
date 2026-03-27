@@ -33,10 +33,7 @@ export const createApiClient = ({ getTokens, role, onTokens, onLogout }) => {
                 ? '/affiliate/refresh'
                 : '/auth/refresh-token'
 
-          const payload =
-            role === 'superadmin' || role === 'affiliate'
-              ? { refreshToken: tokens.refreshToken }
-              : { refreshToken: tokens.refreshToken }
+          const payload = { refreshToken: tokens.refreshToken }
 
           const refreshRes = await axios.post(`${defaultBaseURL}${refreshPath}`, payload)
           const newAccess =

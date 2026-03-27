@@ -2,12 +2,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { io } from 'socket.io-client'
 import { useAuth } from '../context/AuthContext'
 
+const SOCKET_URL =
+  import.meta.env.VITE_SOCKET_URL?.replace(/\/$/, '') || 'http://localhost:5000'
+
 export const useSocket = (enabled = true) => {
   const { tokens } = useAuth()
   const [socket, setSocket] = useState(null)
   const [connected, setConnected] = useState(false)
-  const socketUrl =
-    import.meta.env.VITE_SOCKET_URL?.replace(/\/$/, '') || 'http://localhost:5000'
 
   const authToken = tokens?.accessToken
 
@@ -19,7 +20,7 @@ export const useSocket = (enabled = true) => {
       return
     }
 
-    const client = io(socketUrl, {
+    const client = io(SOCKET_URL, {
       transports: ['websocket'],
       auth: { token: authToken },
     })
@@ -32,7 +33,7 @@ export const useSocket = (enabled = true) => {
     return () => {
       client.disconnect()
     }
-  }, [enabled, authToken, socketUrl])
+  }, [enabled, authToken])
 
   return useMemo(
     () => ({
