@@ -1,22 +1,25 @@
 // src/whatsapp/engine.js
 // ─────────────────────────────────────────────────────────────
-// WaizAI WhatsApp Engine — Abstraction over whatsapp-web.js
-// ALL whatsapp-web.js calls happen ONLY in this file and its
-// sub-modules. Nothing else in the codebase touches WAWebJS directly.
+// WaizAI WhatsApp Engine — Abstraction over Baileys
 // ─────────────────────────────────────────────────────────────
 
-const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
+const {
+  default: makeWASocket,
+  useMultiFileAuthState,
+  DisconnectReason,
+} = require('@whiskeysockets/baileys');
+const pino = require('pino');
 const qrcode = require('qrcode');
 const path = require('path');
 const fs = require('fs');
 const prisma = require('../config/database');
 const logger = require('../config/logger');
 const { getSocketIO } = require('../socket/socketManager');
-const { handleIncomingMessage } = require('./messageHandler');
-const { cacheSet, cacheGet } = require('../config/redis');
 
-// Map of numberId → WAWebJS Client instance
+// Map of numberId → Baileys socket instance
 const activeSessions = new Map();
+const reconnectTimers = new Map();
+const manualDisconnects = new Set();
 
 // ── INIT ENGINE ──────────────────────────────────────────────
 async function initWAEngine() {
@@ -42,127 +45,100 @@ async function createSession(numberId, tenantId, phoneLabel) {
     return activeSessions.get(numberId);
   }
 
-  const sessionDir = path.join(process.env.WA_SESSION_DIR || './sessions', tenantId, numberId);
+  const sessionDir = path.join(process.env.WA_SESSION_DIR || './whatsapp-auth-state', tenantId, numberId);
   fs.mkdirSync(sessionDir, { recursive: true });
 
   logger.info(`Creating WA session for number: ${numberId} (tenant: ${tenantId})`);
 
-  const client = new Client({
-    authStrategy: new LocalAuth({
-      clientId: numberId,
-      dataPath: sessionDir,
-    }),
-    puppeteer: {
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--disable-gpu',
-      ],
-    },
-    webVersionCache: {
-      type: 'remote',
-      remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
-    },
+  const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
+  const sock = makeWASocket({
+    auth: state,
+    logger: pino({ level: process.env.BAILEYS_LOG_LEVEL || 'error' }),
+    printQRInTerminal: false,
   });
 
-  // ── QR CODE ───────────────────────────────────────────────
-  client.on('qr', async (qr) => {
-    logger.info(`QR generated for ${numberId}`);
-    try {
-      const qrDataUrl = await qrcode.toDataURL(qr);
+  sock.ev.on('creds.update', saveCreds);
+
+  sock.ev.on('connection.update', async (update) => {
+    const { connection, qr, lastDisconnect } = update;
+
+    if (qr) {
+      logger.info(`QR generated for ${numberId}`);
+      try {
+        const qrDataUrl = await qrcode.toDataURL(qr);
+        await prisma.tenantNumber.update({
+          where: { id: numberId },
+          data: { sessionStatus: 'qr_pending', qrCode: qrDataUrl },
+        });
+        const io = getSocketIO();
+        io.to(`tenant:${tenantId}`).emit('wa:qr', { numberId, qr: qrDataUrl });
+      } catch (err) {
+        logger.error(`QR generation error for ${numberId}:`, err);
+      }
+    }
+
+    if (connection === 'open') {
+      logger.info(`✅ WhatsApp ready for ${numberId}`);
+      const user = sock.user?.id ? sock.user.id.split(':')[0] : null;
       await prisma.tenantNumber.update({
         where: { id: numberId },
-        data: { sessionStatus: 'qr_pending', qrCode: qrDataUrl },
+        data: {
+          sessionStatus: 'connected',
+          phoneNumber: user ? `+${user}` : undefined,
+          qrCode: null,
+          lastConnectedAt: new Date(),
+        },
       });
-      // Push QR to frontend via socket
       const io = getSocketIO();
-      io.to(`tenant:${tenantId}`).emit('wa:qr', { numberId, qr: qrDataUrl });
-    } catch (err) {
-      logger.error(`QR generation error for ${numberId}:`, err);
+      io.to(`tenant:${tenantId}`).emit('wa:ready', { numberId, phone: user });
+    }
+
+    if (connection === 'close') {
+      const statusCode = lastDisconnect?.error?.output?.statusCode;
+      const isLoggedOut = statusCode === DisconnectReason.loggedOut;
+      logger.warn(`WA disconnected for ${numberId}: ${statusCode || 'unknown'}`);
+
+      activeSessions.delete(numberId);
+      await prisma.tenantNumber.update({
+        where: { id: numberId },
+        data: { sessionStatus: 'disconnected' },
+      });
+      const io = getSocketIO();
+      io.to(`tenant:${tenantId}`).emit('wa:disconnected', { numberId, reason: statusCode || 'closed' });
+
+      if (manualDisconnects.has(numberId)) {
+        manualDisconnects.delete(numberId);
+        return;
+      }
+
+      if (!isLoggedOut) {
+        if (reconnectTimers.has(numberId)) clearTimeout(reconnectTimers.get(numberId));
+        const timer = setTimeout(() => {
+          reconnectTimers.delete(numberId);
+          createSession(numberId, tenantId, phoneLabel).catch(err => {
+            logger.error(`Auto-reconnect failed for ${numberId}:`, err.message);
+          });
+        }, Number(process.env.WA_RECONNECT_DELAY_MS || 3000));
+        reconnectTimers.set(numberId, timer);
+      }
     }
   });
 
-  // ── READY ─────────────────────────────────────────────────
-  client.on('ready', async () => {
-    logger.info(`✅ WhatsApp ready for ${numberId}`);
-    const info = client.info;
-    await prisma.tenantNumber.update({
-      where: { id: numberId },
-      data: {
-        sessionStatus: 'connected',
-        phoneNumber: info?.wid?.user ? `+${info.wid.user}` : undefined,
-        qrCode: null,
-        lastConnectedAt: new Date(),
-      },
-    });
-    const io = getSocketIO();
-    io.to(`tenant:${tenantId}`).emit('wa:ready', { numberId, phone: info?.wid?.user });
-  });
-
-  // ── INCOMING MESSAGE ──────────────────────────────────────
-  client.on('message', async (msg) => {
-    // Skip status messages
-    if (msg.isStatus) return;
-    await handleIncomingMessage(client, msg, numberId, tenantId);
-  });
-
-  // ── MESSAGE CREATE (outbound) ─────────────────────────────
-  client.on('message_create', async (msg) => {
-    if (!msg.fromMe) return;
-    // Log outbound messages (manually sent from WA phone)
-    try {
-      const contact = await getOrCreateContact(tenantId, numberId, msg.to);
-      await prisma.message.create({
-        data: {
-          tenantId, numberId, contactId: contact?.id,
-          waMessageId: msg.id.id,
-          fromJid: msg.from, toJid: msg.to,
-          body: msg.body, type: msg.type,
-          direction: 'outbound', aiSent: false,
-          timestamp: new Date(msg.timestamp * 1000),
-        },
-      });
-    } catch (_) {}
-  });
-
-  // ── DISCONNECTED ──────────────────────────────────────────
-  client.on('disconnected', async (reason) => {
-    logger.warn(`WA disconnected for ${numberId}: ${reason}`);
-    activeSessions.delete(numberId);
-    await prisma.tenantNumber.update({
-      where: { id: numberId },
-      data: { sessionStatus: 'disconnected' },
-    });
-    const io = getSocketIO();
-    io.to(`tenant:${tenantId}`).emit('wa:disconnected', { numberId, reason });
-  });
-
-  // ── AUTH FAILURE ──────────────────────────────────────────
-  client.on('auth_failure', async (msg) => {
-    logger.error(`Auth failure for ${numberId}: ${msg}`);
-    activeSessions.delete(numberId);
-    await prisma.tenantNumber.update({
-      where: { id: numberId },
-      data: { sessionStatus: 'disconnected' },
-    });
-  });
-
-  activeSessions.set(numberId, client);
-  client.initialize();
-  return client;
+  activeSessions.set(numberId, sock);
+  return sock;
 }
 
 // ── DESTROY SESSION ───────────────────────────────────────────
 async function destroySession(numberId) {
-  const client = activeSessions.get(numberId);
-  if (!client) return;
+  const sock = activeSessions.get(numberId);
+  if (!sock) return;
+  manualDisconnects.add(numberId);
+  if (reconnectTimers.has(numberId)) {
+    clearTimeout(reconnectTimers.get(numberId));
+    reconnectTimers.delete(numberId);
+  }
   try {
-    await client.destroy();
+    sock.end(new Error('Manual disconnect'));
   } catch (err) {
     logger.error(`Error destroying session ${numberId}:`, err);
   }
@@ -386,9 +362,9 @@ async function getContactInfo(numberId, contactJid) {
 
 // ── SESSION STATUS ────────────────────────────────────────────
 function getSessionStatus(numberId) {
-  const client = activeSessions.get(numberId);
-  if (!client) return 'disconnected';
-  return client.info ? 'connected' : 'connecting';
+  const sock = activeSessions.get(numberId);
+  if (!sock) return 'disconnected';
+  return sock.user ? 'connected' : 'connecting';
 }
 
 // ── HELPER: get or create contact ─────────────────────────────
