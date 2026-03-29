@@ -9,31 +9,7 @@ const { getSession } = require('../whatsapp/engine');
 // ── LIST CHANNELS ──────────────────────────────────────────────
 async function listChannels(req, res, next) {
   try {
-    const { numberId } = req.query;
-    if (!numberId) return next(new ValidationError('numberId query param is required'));
-
-    const number = await prisma.tenantNumber.findFirst({
-      where: { id: numberId, tenantId: req.tenantId },
-    });
-    if (!number) return next(new AppError('Number not found', 404));
-    if (number.sessionStatus !== 'connected') {
-      return next(new AppError('WhatsApp number is not connected', 400));
-    }
-
-    const session = getSession(numberId);
-    if (!session) return next(new AppError('Session not active', 400));
-
-    // whatsapp-web.js: getChannels() returns an array of Channel objects
-    const channels = await session.getChannels().catch(() => []);
-    const channelList = channels.map(ch => ({
-      id:    ch.id._serialized,
-      name:  ch.name,
-      description: ch.description || null,
-      subscriberCount: ch.subscriberCount || 0,
-      isAdmin: ch.isAdmin || false,
-    }));
-
-    return success(res, { channels: channelList });
+    return next(new AppError('WhatsApp Channels are not supported with current Baileys integration', 501));
   } catch (err) {
     next(err);
   }
@@ -42,30 +18,7 @@ async function listChannels(req, res, next) {
 // ── GET CHANNEL ────────────────────────────────────────────────
 async function getChannel(req, res, next) {
   try {
-    const { channelId } = req.params;
-    const { numberId }  = req.query;
-    if (!numberId) return next(new ValidationError('numberId query param is required'));
-
-    const number = await prisma.tenantNumber.findFirst({
-      where: { id: numberId, tenantId: req.tenantId },
-    });
-    if (!number) return next(new AppError('Number not found', 404));
-
-    const session = getSession(numberId);
-    if (!session) return next(new AppError('Session not active', 400));
-
-    const chat = await session.getChatById(channelId).catch(() => null);
-    if (!chat || !chat.isChannel) return next(new AppError('Channel not found', 404));
-
-    return success(res, {
-      channel: {
-        id:          chat.id._serialized,
-        name:        chat.name,
-        description: chat.description || null,
-        subscriberCount: chat.subscriberCount || 0,
-        isAdmin:     chat.isAdmin || false,
-      },
-    });
+    return next(new AppError('WhatsApp Channels are not supported with current Baileys integration', 501));
   } catch (err) {
     next(err);
   }
@@ -74,31 +27,7 @@ async function getChannel(req, res, next) {
 // ── CREATE CHANNEL ─────────────────────────────────────────────
 async function createChannel(req, res, next) {
   try {
-    const { numberId, name, description } = req.body;
-    if (!numberId || !name) return next(new ValidationError('numberId and name are required'));
-
-    const number = await prisma.tenantNumber.findFirst({
-      where: { id: numberId, tenantId: req.tenantId },
-    });
-    if (!number) return next(new AppError('Number not found', 404));
-    if (number.sessionStatus !== 'connected') {
-      return next(new AppError('WhatsApp number is not connected', 400));
-    }
-
-    const session = getSession(numberId);
-    if (!session) return next(new AppError('Session not active', 400));
-
-    // whatsapp-web.js: createChannel(name, description)
-    const channel = await session.createChannel(name, description || '').catch(err => {
-      throw new AppError(`Failed to create channel: ${err.message}`, 500);
-    });
-
-    return success(res, {
-      channel: {
-        id: channel.id._serialized,
-        name: channel.name,
-      },
-    }, 'Channel created', 201);
+    return next(new AppError('WhatsApp Channels are not supported with current Baileys integration', 501));
   } catch (err) {
     next(err);
   }
@@ -107,26 +36,7 @@ async function createChannel(req, res, next) {
 // ── UPDATE CHANNEL ─────────────────────────────────────────────
 async function updateChannel(req, res, next) {
   try {
-    const { channelId }       = req.params;
-    const { numberId, name, description } = req.body;
-    if (!numberId) return next(new ValidationError('numberId is required'));
-
-    const number = await prisma.tenantNumber.findFirst({
-      where: { id: numberId, tenantId: req.tenantId },
-    });
-    if (!number) return next(new AppError('Number not found', 404));
-
-    const session = getSession(numberId);
-    if (!session) return next(new AppError('Session not active', 400));
-
-    const chat = await session.getChatById(channelId).catch(() => null);
-    if (!chat) return next(new AppError('Channel not found', 404));
-    if (!chat.isAdmin) return next(new AppError('You must be admin to update this channel', 403));
-
-    if (name)        await chat.setSubject(name).catch(() => {});
-    if (description) await chat.setDescription(description).catch(() => {});
-
-    return success(res, {}, 'Channel updated');
+    return next(new AppError('WhatsApp Channels are not supported with current Baileys integration', 501));
   } catch (err) {
     next(err);
   }
@@ -135,37 +45,7 @@ async function updateChannel(req, res, next) {
 // ── POST UPDATE ────────────────────────────────────────────────
 async function postUpdate(req, res, next) {
   try {
-    const { channelId }  = req.params;
-    const { numberId, body, mediaUrl, mediaType } = req.body;
-    if (!numberId || !body) return next(new ValidationError('numberId and body are required'));
-
-    const number = await prisma.tenantNumber.findFirst({
-      where: { id: numberId, tenantId: req.tenantId },
-    });
-    if (!number) return next(new AppError('Number not found', 404));
-    if (number.sessionStatus !== 'connected') {
-      return next(new AppError('WhatsApp number is not connected', 400));
-    }
-
-    const session = getSession(numberId);
-    if (!session) return next(new AppError('Session not active', 400));
-
-    const chat = await session.getChatById(channelId).catch(() => null);
-    if (!chat) return next(new AppError('Channel not found', 404));
-
-    if (mediaUrl) {
-      const { MessageMedia } = require('whatsapp-web.js');
-      const media = await MessageMedia.fromUrl(mediaUrl).catch(() => null);
-      if (media) {
-        await chat.sendMessage(media, { caption: body });
-      } else {
-        await chat.sendMessage(body);
-      }
-    } else {
-      await chat.sendMessage(body);
-    }
-
-    return success(res, {}, 'Update posted to channel');
+    return next(new AppError('WhatsApp Channels are not supported with current Baileys integration', 501));
   } catch (err) {
     next(err);
   }
@@ -174,29 +54,7 @@ async function postUpdate(req, res, next) {
 // ── GET CHANNEL ANALYTICS ──────────────────────────────────────
 async function getChannelAnalytics(req, res, next) {
   try {
-    const { channelId } = req.params;
-    const { numberId }  = req.query;
-    if (!numberId) return next(new ValidationError('numberId query param is required'));
-
-    const number = await prisma.tenantNumber.findFirst({
-      where: { id: numberId, tenantId: req.tenantId },
-    });
-    if (!number) return next(new AppError('Number not found', 404));
-
-    const session = getSession(numberId);
-    if (!session) return next(new AppError('Session not active', 400));
-
-    const chat = await session.getChatById(channelId).catch(() => null);
-    if (!chat) return next(new AppError('Channel not found', 404));
-
-    // Basic analytics available from the chat object
-    const analytics = {
-      subscriberCount: chat.subscriberCount || 0,
-      name:            chat.name,
-      isAdmin:         chat.isAdmin || false,
-    };
-
-    return success(res, { analytics });
+    return next(new AppError('WhatsApp Channels are not supported with current Baileys integration', 501));
   } catch (err) {
     next(err);
   }

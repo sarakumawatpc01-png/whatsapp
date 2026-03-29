@@ -12,18 +12,109 @@ const pino = require('pino');
 const qrcode = require('qrcode');
 const path = require('path');
 const fs = require('fs');
+const axios = require('axios');
 const prisma = require('../config/database');
 const logger = require('../config/logger');
 const { getSocketIO } = require('../socket/socketManager');
+const { handleIncomingMessage } = require('./messageHandler');
+const { normalizeToJid } = require('./jid');
+const { getOrCreateContact } = require('./contactStore');
 
 // Map of numberId → Baileys socket instance
 const activeSessions = new Map();
 const reconnectTimers = new Map();
 const manualDisconnects = new Set();
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function getMessageContent(msg = {}) {
+  return msg.message || msg;
+}
+
+function inferTypeFromBaileys(msg) {
+  const content = getMessageContent(msg);
+  if (content.conversation || content.extendedTextMessage) return 'text';
+  if (content.imageMessage) return 'image';
+  if (content.videoMessage) return 'video';
+  if (content.audioMessage) return 'audio';
+  if (content.documentMessage) return 'document';
+  if (content.stickerMessage) return 'sticker';
+  if (content.locationMessage) return 'location';
+  if (content.contactMessage || content.contactsArrayMessage) return 'contact_card';
+  if (content.pollCreationMessage || content.pollCreationMessageV2 || content.pollCreationMessageV3) return 'poll';
+  if (content.reactionMessage) return 'reaction';
+  return 'text';
+}
+
+function extractBodyFromBaileys(msg) {
+  const content = getMessageContent(msg);
+  return (
+    content.conversation
+    || content.extendedTextMessage?.text
+    || content.imageMessage?.caption
+    || content.videoMessage?.caption
+    || content.documentMessage?.caption
+    || content.locationMessage?.name
+    || content.locationMessage?.address
+    || content.reactionMessage?.text
+    || ''
+  );
+}
+
+function extractContextInfo(msg) {
+  const content = getMessageContent(msg);
+  return (
+    content.extendedTextMessage?.contextInfo
+    || content.imageMessage?.contextInfo
+    || content.videoMessage?.contextInfo
+    || content.documentMessage?.contextInfo
+    || content.buttonsResponseMessage?.contextInfo
+    || content.listResponseMessage?.contextInfo
+    || null
+  );
+}
+
+function mapBaileysToLegacyMessage(sock, msg) {
+  const contextInfo = extractContextInfo(msg);
+  const type = inferTypeFromBaileys(msg);
+  const content = getMessageContent(msg);
+  const remoteJid = msg?.key?.remoteJid;
+  const mentionedJidList = contextInfo?.mentionedJid || [];
+  const quotedStanzaID = contextInfo?.stanzaId || null;
+  const notifyName = msg?.pushName || null;
+
+  return {
+    id: { id: msg?.key?.id },
+    from: remoteJid,
+    to: sock?.user?.id || null,
+    body: extractBodyFromBaileys(msg),
+    type,
+    fromMe: Boolean(msg?.key?.fromMe),
+    timestamp: Number(msg?.messageTimestamp || Math.floor(Date.now() / 1000)),
+    hasMedia: ['image', 'video', 'audio', 'document', 'sticker'].includes(type),
+    hasQuotedMsg: Boolean(contextInfo?.stanzaId),
+    location: content.locationMessage
+      ? {
+          latitude: content.locationMessage.degreesLatitude,
+          longitude: content.locationMessage.degreesLongitude,
+          description: content.locationMessage.name || content.locationMessage.address || null,
+        }
+      : null,
+    _data: {
+      notifyName,
+      mentionedJidList,
+      quotedStanzaID,
+    },
+    notifyName,
+    mentionedJidList,
+    quotedStanzaID,
+  };
+}
+
 // ── INIT ENGINE ──────────────────────────────────────────────
 async function initWAEngine() {
-  // On server start, reconnect all numbers that were previously connected
   const numbers = await prisma.tenantNumber.findMany({
     where: { sessionStatus: { in: ['connected', 'connecting'] } },
     include: { tenant: { select: { status: true } } },
@@ -45,6 +136,11 @@ async function createSession(numberId, tenantId, phoneLabel) {
     return activeSessions.get(numberId);
   }
 
+  if (reconnectTimers.has(numberId)) {
+    clearTimeout(reconnectTimers.get(numberId));
+    reconnectTimers.delete(numberId);
+  }
+
   const sessionDir = path.join(process.env.WA_SESSION_DIR || './whatsapp-auth-state', tenantId, numberId);
   fs.mkdirSync(sessionDir, { recursive: true });
 
@@ -55,6 +151,7 @@ async function createSession(numberId, tenantId, phoneLabel) {
     auth: state,
     logger: pino({ level: process.env.BAILEYS_LOG_LEVEL || 'error' }),
     printQRInTerminal: false,
+    markOnlineOnConnect: false,
   });
 
   sock.ev.on('creds.update', saveCreds);
@@ -102,7 +199,7 @@ async function createSession(numberId, tenantId, phoneLabel) {
       await prisma.tenantNumber.update({
         where: { id: numberId },
         data: { sessionStatus: 'disconnected' },
-      });
+      }).catch(() => {});
       const io = getSocketIO();
       io.to(`tenant:${tenantId}`).emit('wa:disconnected', { numberId, reason: statusCode || 'closed' });
 
@@ -124,6 +221,21 @@ async function createSession(numberId, tenantId, phoneLabel) {
     }
   });
 
+  // Step 3: incoming listener migration
+  sock.ev.on('messages.upsert', async ({ messages, type }) => {
+    if (type !== 'notify') return;
+
+    for (const raw of messages || []) {
+      const remoteJid = raw?.key?.remoteJid;
+      if (!remoteJid || remoteJid === 'status@broadcast') continue;
+      if (raw?.key?.fromMe) continue;
+      if (!raw?.message) continue;
+
+      const mapped = mapBaileysToLegacyMessage(sock, raw);
+      await handleIncomingMessage(sock, mapped, numberId, tenantId);
+    }
+  });
+
   activeSessions.set(numberId, sock);
   return sock;
 }
@@ -132,11 +244,13 @@ async function createSession(numberId, tenantId, phoneLabel) {
 async function destroySession(numberId) {
   const sock = activeSessions.get(numberId);
   if (!sock) return;
+
   manualDisconnects.add(numberId);
   if (reconnectTimers.has(numberId)) {
     clearTimeout(reconnectTimers.get(numberId));
     reconnectTimers.delete(numberId);
   }
+
   try {
     sock.end(new Error('Manual disconnect'));
   } catch (err) {
@@ -155,16 +269,37 @@ async function sendTextMessage(numberId, toJid, text, quotedMsgId = null) {
   const client = getSession(numberId);
   if (!client) throw new Error(`No active session for numberId: ${numberId}`);
 
-  const options = {};
+  const jid = normalizeToJid(toJid);
+  let quoted;
+
   if (quotedMsgId) {
-    try {
-      const quotedMsg = await client.getMessageById(quotedMsgId);
-      if (quotedMsg) options.quotedMessageId = quotedMsg.id._serialized;
-    } catch (_) {}
+    const quotedDb = await prisma.message.findFirst({
+      where: {
+        numberId,
+        OR: [{ waMessageId: quotedMsgId }, { id: quotedMsgId }],
+      },
+      select: { waMessageId: true, fromJid: true, toJid: true, direction: true },
+    }).catch(() => null);
+
+    if (quotedDb?.waMessageId) {
+      const quotedJid = normalizeToJid(quotedDb.direction === 'inbound' ? quotedDb.fromJid : quotedDb.toJid);
+      quoted = {
+        key: {
+          remoteJid: quotedJid,
+          id: quotedDb.waMessageId,
+          fromMe: quotedDb.direction === 'outbound',
+        },
+      };
+    }
   }
 
-  const result = await client.sendMessage(toJid, text, options);
-  return result;
+  const result = await client.sendMessage(jid, { text: String(text || '') }, { ...(quoted ? { quoted } : {}) });
+  return {
+    id: { id: result?.key?.id || null },
+    from: client.user?.id || null,
+    to: jid,
+    raw: result,
+  };
 }
 
 // ── SEND MEDIA ─────────────────────────────────────────────────
@@ -172,62 +307,171 @@ async function sendMediaMessage(numberId, toJid, mediaData, caption = '') {
   const client = getSession(numberId);
   if (!client) throw new Error(`No active session for numberId: ${numberId}`);
 
-  const media = new MessageMedia(mediaData.mimetype, mediaData.base64, mediaData.filename);
-  const result = await client.sendMessage(toJid, media, { caption });
-  return result;
+  const jid = normalizeToJid(toJid);
+  const buffer = Buffer.from(mediaData.base64, 'base64');
+  const mimetype = mediaData.mimetype || '';
+  const filename = mediaData.filename || 'file';
+
+  let payload;
+  if (mimetype.startsWith('image/')) {
+    payload = { image: buffer, caption, mimetype };
+  } else if (mimetype.startsWith('video/')) {
+    payload = { video: buffer, caption, mimetype };
+  } else if (mimetype.startsWith('audio/')) {
+    payload = { audio: buffer, mimetype, ptt: false };
+  } else {
+    payload = { document: buffer, fileName: filename, mimetype, caption };
+  }
+
+  const result = await client.sendMessage(jid, payload);
+  return {
+    id: { id: result?.key?.id || null },
+    from: client.user?.id || null,
+    to: jid,
+    raw: result,
+  };
 }
 
 // ── SEND LOCATION ─────────────────────────────────────────────
 async function sendLocation(numberId, toJid, lat, lng, name = '') {
   const client = getSession(numberId);
   if (!client) throw new Error(`No active session for numberId: ${numberId}`);
-  const { Location } = require('whatsapp-web.js');
-  const result = await client.sendMessage(toJid, new Location(lat, lng, name));
-  return result;
+
+  const jid = normalizeToJid(toJid);
+  const result = await client.sendMessage(jid, {
+    location: {
+      degreesLatitude: Number(lat),
+      degreesLongitude: Number(lng),
+      name: name || undefined,
+    },
+  });
+
+  return {
+    id: { id: result?.key?.id || null },
+    from: client.user?.id || null,
+    to: jid,
+    raw: result,
+  };
 }
 
 // ── SEND CONTACT CARD ─────────────────────────────────────────
 async function sendContactCard(numberId, toJid, contactPhone, contactName) {
   const client = getSession(numberId);
   if (!client) throw new Error(`No active session for numberId: ${numberId}`);
-  const { Contact: WAContact } = require('whatsapp-web.js');
-  const contacts = await client.getContacts();
-  const contact = contacts.find(c => c.number === contactPhone.replace(/\D/g, ''));
-  if (!contact) throw new Error('Contact not found in WhatsApp');
-  const result = await client.sendMessage(toJid, contact);
-  return result;
+
+  const jid = normalizeToJid(toJid);
+  const phone = String(contactPhone || '').replace(/\D/g, '');
+  const displayName = contactName || phone;
+
+  const vcard = [
+    'BEGIN:VCARD',
+    'VERSION:3.0',
+    `FN:${displayName}`,
+    `TEL;type=CELL;type=VOICE;waid=${phone}:${phone}`,
+    'END:VCARD',
+  ].join('\n');
+
+  const result = await client.sendMessage(jid, {
+    contacts: {
+      displayName,
+      contacts: [{ vcard }],
+    },
+  });
+
+  return {
+    id: { id: result?.key?.id || null },
+    from: client.user?.id || null,
+    to: jid,
+    raw: result,
+  };
 }
 
 // ── SEND REACTION ─────────────────────────────────────────────
 async function sendReaction(numberId, msgId, emoji) {
   const client = getSession(numberId);
   if (!client) throw new Error(`No active session for numberId: ${numberId}`);
-  const msg = await client.getMessageById(msgId);
-  if (!msg) throw new Error('Message not found');
-  await msg.react(emoji);
+
+  const target = await prisma.message.findFirst({
+    where: {
+      numberId,
+      OR: [{ waMessageId: msgId }, { id: msgId }],
+    },
+    select: { waMessageId: true, fromJid: true, toJid: true, direction: true },
+  });
+  if (!target?.waMessageId) throw new Error('Message not found');
+
+  const remoteJid = normalizeToJid(target.direction === 'inbound' ? target.fromJid : target.toJid);
+
+  await client.sendMessage(remoteJid, {
+    react: {
+      text: emoji,
+      key: {
+        remoteJid,
+        id: target.waMessageId,
+        fromMe: target.direction === 'outbound',
+      },
+    },
+  });
 }
 
 // ── SEND POLL ─────────────────────────────────────────────────
 async function sendPoll(numberId, toJid, question, options, allowMultiple = false) {
   const client = getSession(numberId);
   if (!client) throw new Error(`No active session for numberId: ${numberId}`);
-  const { Poll } = require('whatsapp-web.js');
-  const result = await client.sendMessage(toJid, new Poll(question, options, { allowMultipleAnswers: allowMultiple }));
-  return result;
+
+  const jid = normalizeToJid(toJid);
+  const result = await client.sendMessage(jid, {
+    poll: {
+      name: question,
+      values: options,
+      selectableCount: allowMultiple ? Math.max(options.length, 1) : 1,
+    },
+  });
+
+  return {
+    id: { id: result?.key?.id || null },
+    from: client.user?.id || null,
+    to: jid,
+    raw: result,
+  };
 }
 
 // ── SEND TYPING INDICATOR ─────────────────────────────────────
 async function sendTyping(numberId, chatId, duration = 3000) {
   const client = getSession(numberId);
   if (!client) return;
+
   try {
-    const chat = await client.getChatById(chatId);
-    await chat.sendStateTyping();
-    await new Promise(r => setTimeout(r, duration));
-    await chat.clearState();
+    const jid = normalizeToJid(chatId);
+    await client.presenceSubscribe(jid).catch(() => {});
+    await client.sendPresenceUpdate('composing', jid);
+    await sleep(duration);
+    await client.sendPresenceUpdate('paused', jid);
   } catch (err) {
     logger.debug(`Typing indicator error (non-fatal): ${err.message}`);
   }
+}
+
+// ── SEND STATUS POST ──────────────────────────────────────────
+async function sendStatusPost(numberId, body = '', mediaUrl = null) {
+  const client = getSession(numberId);
+  if (!client) throw new Error('No active session');
+
+  if (!mediaUrl) {
+    return client.sendMessage('status@broadcast', { text: body || '' });
+  }
+
+  const response = await axios.get(mediaUrl, { responseType: 'arraybuffer', timeout: 15000 });
+  const mime = response.headers['content-type'] || 'application/octet-stream';
+  const buffer = Buffer.from(response.data);
+
+  if (mime.startsWith('image/')) {
+    return client.sendMessage('status@broadcast', { image: buffer, caption: body || '', mimetype: mime });
+  }
+  if (mime.startsWith('video/')) {
+    return client.sendMessage('status@broadcast', { video: buffer, caption: body || '', mimetype: mime });
+  }
+  return client.sendMessage('status@broadcast', { document: buffer, fileName: 'status-file', mimetype: mime, caption: body || '' });
 }
 
 // ── GET PROFILE PICTURE ───────────────────────────────────────
@@ -235,129 +479,164 @@ async function getProfilePicture(numberId, contactJid) {
   const client = getSession(numberId);
   if (!client) return null;
   try {
-    return await client.getProfilePicUrl(contactJid);
-  } catch (_) { return null; }
+    return await client.profilePictureUrl(normalizeToJid(contactJid), 'image');
+  } catch (_) {
+    return null;
+  }
 }
 
-// ── BLOCK / UNBLOCK ────────────────────────────────────────────
+// ── BLOCK / UNBLOCK ───────────────────────────────────────────
 async function blockContact(numberId, contactJid) {
   const client = getSession(numberId);
   if (!client) throw new Error('No active session');
-  const contact = await client.getContactById(contactJid);
-  await contact.block();
+  await client.updateBlockStatus(normalizeToJid(contactJid), 'block');
 }
 
 async function unblockContact(numberId, contactJid) {
   const client = getSession(numberId);
   if (!client) throw new Error('No active session');
-  const contact = await client.getContactById(contactJid);
-  await contact.unblock();
+  await client.updateBlockStatus(normalizeToJid(contactJid), 'unblock');
 }
 
 // ── MUTE / UNMUTE ─────────────────────────────────────────────
-async function muteChat(numberId, chatJid, unmuteDate) {
-  const client = getSession(numberId);
-  if (!client) throw new Error('No active session');
-  const chat = await client.getChatById(chatJid);
-  await chat.mute(unmuteDate);
+async function muteChat() {
+  throw new Error('Mute chat is not currently supported with Baileys in this build');
 }
 
-async function unmuteChat(numberId, chatJid) {
-  const client = getSession(numberId);
-  if (!client) throw new Error('No active session');
-  const chat = await client.getChatById(chatJid);
-  await chat.unmute();
+async function unmuteChat() {
+  throw new Error('Unmute chat is not currently supported with Baileys in this build');
 }
 
 // ── GROUPS ────────────────────────────────────────────────────
 async function createGroup(numberId, name, participantJids) {
   const client = getSession(numberId);
   if (!client) throw new Error('No active session');
-  return await client.createGroup(name, participantJids);
+
+  const participants = (participantJids || []).map(normalizeToJid).filter(Boolean);
+  const result = await client.groupCreate(name, participants);
+  return { gid: { _serialized: result.id }, ...result };
 }
 
 async function getGroups(numberId) {
   const client = getSession(numberId);
   if (!client) return [];
-  const chats = await client.getChats();
-  return chats.filter(c => c.isGroup);
+
+  const groups = await client.groupFetchAllParticipating();
+  return Object.values(groups || {}).map(g => ({
+    id: { _serialized: g.id },
+    name: g.subject,
+    isGroup: true,
+    participants: g.participants,
+  }));
 }
 
 async function getGroupInviteCode(numberId, groupJid) {
   const client = getSession(numberId);
   if (!client) throw new Error('No active session');
-  const group = await client.getChatById(groupJid);
-  return await group.getInviteCode();
+  return client.groupInviteCode(normalizeToJid(groupJid));
 }
 
 async function joinGroupByInvite(numberId, inviteCode) {
   const client = getSession(numberId);
   if (!client) throw new Error('No active session');
-  return await client.acceptInvite(inviteCode);
+  return client.groupAcceptInvite(inviteCode);
 }
 
 async function addGroupParticipants(numberId, groupJid, participantJids) {
   const client = getSession(numberId);
   if (!client) throw new Error('No active session');
-  const group = await client.getChatById(groupJid);
-  return await group.addParticipants(participantJids);
+  return client.groupParticipantsUpdate(normalizeToJid(groupJid), participantJids.map(normalizeToJid), 'add');
 }
 
 async function removeGroupParticipant(numberId, groupJid, participantJid) {
   const client = getSession(numberId);
   if (!client) throw new Error('No active session');
-  const group = await client.getChatById(groupJid);
-  return await group.removeParticipants([participantJid]);
+  return client.groupParticipantsUpdate(normalizeToJid(groupJid), [normalizeToJid(participantJid)], 'remove');
 }
 
 async function promoteParticipant(numberId, groupJid, participantJid) {
   const client = getSession(numberId);
   if (!client) throw new Error('No active session');
-  const group = await client.getChatById(groupJid);
-  return await group.promoteParticipants([participantJid]);
+  return client.groupParticipantsUpdate(normalizeToJid(groupJid), [normalizeToJid(participantJid)], 'promote');
 }
 
 async function demoteParticipant(numberId, groupJid, participantJid) {
   const client = getSession(numberId);
   if (!client) throw new Error('No active session');
-  const group = await client.getChatById(groupJid);
-  return await group.demoteParticipants([participantJid]);
+  return client.groupParticipantsUpdate(normalizeToJid(groupJid), [normalizeToJid(participantJid)], 'demote');
 }
 
 async function updateGroupSubject(numberId, groupJid, subject) {
   const client = getSession(numberId);
   if (!client) throw new Error('No active session');
-  const group = await client.getChatById(groupJid);
-  await group.setSubject(subject);
+  await client.groupUpdateSubject(normalizeToJid(groupJid), subject);
 }
 
 async function updateGroupDescription(numberId, groupJid, description) {
   const client = getSession(numberId);
   if (!client) throw new Error('No active session');
-  const group = await client.getChatById(groupJid);
-  await group.setDescription(description);
+  await client.groupUpdateDescription(normalizeToJid(groupJid), description);
+}
+
+async function updateGroupSettings(numberId, groupJid, settings = {}) {
+  const client = getSession(numberId);
+  if (!client) throw new Error('No active session');
+
+  if (Object.prototype.hasOwnProperty.call(settings, 'messagesAdminsOnly')) {
+    await client.groupSettingUpdate(
+      normalizeToJid(groupJid),
+      settings.messagesAdminsOnly ? 'announcement' : 'not_announcement'
+    );
+  }
+  if (Object.prototype.hasOwnProperty.call(settings, 'infoAdminsOnly')) {
+    await client.groupSettingUpdate(
+      normalizeToJid(groupJid),
+      settings.infoAdminsOnly ? 'locked' : 'unlocked'
+    );
+  }
+}
+
+async function setGroupPicture() {
+  throw new Error('Setting group picture is not currently supported with Baileys in this build');
+}
+
+async function leaveGroup(numberId, groupJid) {
+  const client = getSession(numberId);
+  if (!client) throw new Error('No active session');
+  return client.groupLeave(normalizeToJid(groupJid));
+}
+
+async function getGroupMetadata(numberId, groupJid) {
+  const client = getSession(numberId);
+  if (!client) throw new Error('No active session');
+  return client.groupMetadata(normalizeToJid(groupJid));
 }
 
 // ── STATUS ────────────────────────────────────────────────────
 async function setStatus(numberId, statusText) {
   const client = getSession(numberId);
   if (!client) throw new Error('No active session');
-  await client.setStatus(statusText);
+  await client.updateProfileStatus(statusText);
 }
 
 // ── CONTACT INFO ──────────────────────────────────────────────
 async function getContactInfo(numberId, contactJid) {
   const client = getSession(numberId);
   if (!client) return null;
+
+  const jid = normalizeToJid(contactJid);
   try {
-    const contact = await client.getContactById(contactJid);
+    const [onWa] = await client.onWhatsApp(jid);
+    const status = await client.fetchStatus(jid).catch(() => null);
     return {
-      name: contact.pushname || contact.name,
-      number: contact.number,
-      about: contact.about,
-      isBusiness: contact.isBusiness,
+      name: onWa?.notify || null,
+      number: jid.replace('@s.whatsapp.net', ''),
+      about: status?.status || null,
+      isBusiness: Boolean(onWa?.isBusiness),
     };
-  } catch (_) { return null; }
+  } catch (_) {
+    return null;
+  }
 }
 
 // ── SESSION STATUS ────────────────────────────────────────────
@@ -367,27 +646,43 @@ function getSessionStatus(numberId) {
   return sock.user ? 'connected' : 'connecting';
 }
 
-// ── HELPER: get or create contact ─────────────────────────────
-async function getOrCreateContact(tenantId, numberId, jid) {
-  const phone = jid.replace('@s.whatsapp.net', '').replace('@c.us', '');
-  let contact = await prisma.contact.findUnique({ where: { tenantId_waJid: { tenantId, waJid: jid } } });
-  if (!contact) {
-    contact = await prisma.contact.create({
-      data: { tenantId, numberId, waJid: jid, phoneNumber: phone },
-    });
-  }
-  return contact;
-}
-
 module.exports = {
-  initWAEngine, createSession, destroySession, getSession,
-  sendTextMessage, sendMediaMessage, sendLocation, sendContactCard,
-  sendReaction, sendPoll, sendTyping,
-  getProfilePicture, blockContact, unblockContact,
-  muteChat, unmuteChat, setStatus, getContactInfo,
-  createGroup, getGroups, getGroupInviteCode, joinGroupByInvite,
-  addGroupParticipants, removeGroupParticipant,
-  promoteParticipant, demoteParticipant,
-  updateGroupSubject, updateGroupDescription,
-  getSessionStatus, getOrCreateContact,
+  initWAEngine,
+  createSession,
+  destroySession,
+  getSession,
+  sendTextMessage,
+  sendMediaMessage,
+  sendLocation,
+  sendContactCard,
+  sendReaction,
+  sendPoll,
+  sendTyping,
+  sendStatusPost,
+  getProfilePicture,
+  blockContact,
+  unblockContact,
+  muteChat,
+  unmuteChat,
+  setStatus,
+  getContactInfo,
+  createGroup,
+  getGroups,
+  getGroupInviteCode,
+  joinGroupByInvite,
+  addGroupParticipants,
+  removeGroupParticipant,
+  promoteParticipant,
+  demoteParticipant,
+  updateGroupSubject,
+  updateGroupDescription,
+  updateGroupSettings,
+  setGroupPicture,
+  leaveGroup,
+  getGroupMetadata,
+  // Backward-compat aliases used by controllers
+  promoteGroupParticipant: promoteParticipant,
+  demoteGroupParticipant: demoteParticipant,
+  getSessionStatus,
+  normalizeToJid,
 };

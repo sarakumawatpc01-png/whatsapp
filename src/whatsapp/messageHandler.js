@@ -7,21 +7,27 @@ const logger = require('../config/logger');
 const { getSocketIO } = require('../socket/socketManager');
 const { buildAIReply } = require('../ai/promptBuilder');
 const { sendWithDelay } = require('./delayEngine');
-const { getOrCreateContact } = require('./engine');
+const { getOrCreateContact } = require('./contactStore');
+const { normalizeToJid } = require('./jid');
 const { enrollFollowups, cancelFollowupsForContact } = require('../services/followupService');
 const { cacheGet, cacheSet } = require('../config/redis');
 
 async function handleIncomingMessage(waClient, msg, numberId, tenantId) {
   try {
     // ── 1. Parse message ─────────────────────────────────────
-    const fromJid = msg.from;
-    const toJid   = msg.to;
-    const isGroup  = msg.from.includes('@g.us');
+    const fromJid = msg.from || msg.key?.remoteJid;
+    const toJid   = msg.to || waClient?.user?.id || null;
+    const isGroup  = (fromJid || '').includes('@g.us');
     const body     = msg.body || '';
     const type     = msg.type; // chat | image | audio | video | document | sticker | location | ...
 
+    if (!fromJid) {
+      logger.warn(`Skipping message without fromJid (tenant: ${tenantId}, number: ${numberId})`);
+      return;
+    }
+
     // Skip our own messages
-    if (msg.fromMe) return;
+    if (msg.fromMe || msg.key?.fromMe) return;
 
     // ── 2. Get / create contact ───────────────────────────────
     const contact = await getOrCreateContact(tenantId, numberId, fromJid);
@@ -32,7 +38,7 @@ async function handleIncomingMessage(waClient, msg, numberId, tenantId) {
       data: {
         lastMessageAt: new Date(),
         messageCount: { increment: 1 },
-        name: msg._data?.notifyName || contact.name || undefined,
+        name: msg.notifyName || contact.name || undefined,
       },
     });
 
@@ -51,8 +57,8 @@ async function handleIncomingMessage(waClient, msg, numberId, tenantId) {
         latitude: type === 'location' ? msg.location?.latitude : null,
         longitude: type === 'location' ? msg.location?.longitude : null,
         locationName: type === 'location' ? msg.location?.description : null,
-        quotedMsgId: msg.hasQuotedMsg ? msg._data?.quotedStanzaID : null,
-        metadata: { notifyName: msg._data?.notifyName },
+        quotedMsgId: msg.hasQuotedMsg ? msg.quotedStanzaID : null,
+        metadata: { notifyName: msg.notifyName },
         timestamp: new Date(msg.timestamp * 1000),
       },
     });
@@ -80,8 +86,8 @@ async function handleIncomingMessage(waClient, msg, numberId, tenantId) {
     if (isGroup && !aiConfig.replyInGroups) return;
     if (isGroup && aiConfig.replyInGroups) {
       // In groups, only reply if mentioned
-      const mentionedIds = msg._data?.mentionedJidList || [];
-      const clientJid = waClient.info?.wid?._serialized;
+      const mentionedIds = (msg.mentionedJidList || []).map(normalizeToJid);
+      const clientJid = normalizeToJid(waClient?.user?.id || null);
       const isMentioned = mentionedIds.includes(clientJid);
       if (!isMentioned) return;
     }
