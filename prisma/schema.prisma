@@ -76,10 +76,12 @@ model Tenant {
   messages          Message[]
   campaigns         Campaign[]
   followupSequences FollowupSequence[]
+  followupEnrollments FollowupEnrollment[]
   aiConfig          AiConfig?
   knowledgeDocs     KnowledgeDoc[]
   calendarToken     CalendarToken?
   appointments      Appointment[]
+  groups            WAGroup[]
   subscriptions     Subscription[]
   apiUsage          ApiUsage[]
   statusPosts       StatusPost[]
@@ -308,6 +310,7 @@ model FollowupEnrollment {
   contactId     String
   contact       Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
   tenantId      String
+  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   status        String    @default("pending") // pending | sent | cancelled | replied
   scheduledAt   DateTime
   sentAt        DateTime?
@@ -322,6 +325,7 @@ model FollowupEnrollment {
 model WAGroup {
   id             String   @id @default(uuid())
   tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   numberId       String
   number         TenantNumber @relation(fields: [numberId], references: [id], onDelete: Cascade)
   groupJid       String
