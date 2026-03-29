@@ -5,6 +5,7 @@ const { success, paginated } = require('../utils/response');
 const logger  = require('../config/logger');
 const {
   createGroup: waCreateGroup,
+  getGroups: waGetGroups,
   getGroupInviteCode,
   joinGroupByInvite,
   updateGroupSubject,
@@ -14,7 +15,7 @@ const {
   removeGroupParticipant,
   promoteGroupParticipant,
   demoteGroupParticipant,
-  updateGroupSettings,
+  updateGroupSettings: waUpdateGroupSettings,
   leaveGroup: waLeaveGroup,
   getGroupMetadata,
   getSession,
@@ -141,12 +142,12 @@ async function updateGroupSettings(req, res, next) {
     // messageSendPermission: 'all' | 'admins_only'
     // infoEditPermission:    'all' | 'admins_only'
     if (messageSendPermission) {
-      await updateGroupSettings(group.numberId, group.groupJid, {
+      await waUpdateGroupSettings(group.numberId, group.groupJid, {
         messagesAdminsOnly: messageSendPermission === 'admins_only',
       });
     }
     if (infoEditPermission) {
-      await updateGroupSettings(group.numberId, group.groupJid, {
+      await waUpdateGroupSettings(group.numberId, group.groupJid, {
         infoAdminsOnly: infoEditPermission === 'admins_only',
       });
     }
@@ -351,9 +352,7 @@ async function syncGroups(req, res, next) {
 
     const session = getSession(numberId);
     if (!session) return next(new AppError('Session not active', 400));
-
-    const chats = await session.getChats();
-    const groupChats = chats.filter(c => c.isGroup);
+    const groupChats = await waGetGroups(numberId);
 
     let synced = 0;
     for (const chat of groupChats) {

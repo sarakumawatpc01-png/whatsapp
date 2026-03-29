@@ -4,7 +4,7 @@ const prisma  = require('../config/database');
 const { AppError, ValidationError } = require('../utils/errors');
 const { success, paginated } = require('../utils/response');
 const logger  = require('../config/logger');
-const { getSession } = require('../whatsapp/engine');
+const { getSession, sendStatusPost } = require('../whatsapp/engine');
 
 // ── LIST STATUS POSTS ──────────────────────────────────────────
 async function listStatusPosts(req, res, next) {
@@ -48,17 +48,7 @@ async function createStatusPost(req, res, next) {
     const session = getSession(numberId);
     if (!session) return next(new AppError('Session not active', 400));
 
-    // Post to WhatsApp Status
-    if (mediaUrl) {
-      const { MessageMedia } = require('whatsapp-web.js');
-      const media = await MessageMedia.fromUrl(mediaUrl).catch(err => {
-        throw new AppError(`Failed to load media: ${err.message}`, 400);
-      });
-      await session.setStatus(body || '');
-      await session.sendMessage('status@broadcast', media, { caption: body || '' });
-    } else {
-      await session.setStatus(body);
-    }
+    await sendStatusPost(numberId, body || '', mediaUrl || null);
 
     // Save to DB for history
     const post = await prisma.statusPost.create({

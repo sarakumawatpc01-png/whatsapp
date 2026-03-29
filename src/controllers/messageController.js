@@ -9,6 +9,10 @@ const {
 } = require('../whatsapp/engine');
 const { scheduledQueue } = require('../jobs/processors');
 
+function resolveFromJid(number, result) {
+  return result?.from || `${String(number.phoneNumber || '').replace(/^\+/, '')}@s.whatsapp.net`;
+}
+
 async function resolveTenantContactId(tenantId, contactId) {
   if (!contactId) return null;
   const contact = await prisma.contact.findFirst({
@@ -141,7 +145,7 @@ async function sendText(req, res, next) {
         numberId,
         contactId: safeContactId,
         waMessageId: result?.id?.id,
-        fromJid: `${number.phoneNumber}@s.whatsapp.net`,
+        fromJid: resolveFromJid(number, result),
         toJid,
         body: message,
         type: 'text',
@@ -151,7 +155,7 @@ async function sendText(req, res, next) {
       },
     });
 
-    return success(res, { sent: true, messageId: result?.id?.id }, 'Message sent');
+    return success(res, { sent: true, messageId: result?.id?.id || result?.raw?.key?.id || null }, 'Message sent');
   } catch (err) {
     next(err);
   }
@@ -186,7 +190,7 @@ async function sendMedia(req, res, next) {
         numberId,
         contactId: safeContactId,
         waMessageId: result?.id?.id,
-        fromJid: `${number.phoneNumber}@s.whatsapp.net`,
+        fromJid: resolveFromJid(number, result),
         toJid,
         body: caption || '',
         type: req.file.mimetype.startsWith('image') ? 'image' : 'document',
@@ -215,12 +219,12 @@ async function sendLocationMsg(req, res, next) {
 
     const safeContactId = await resolveTenantContactId(req.tenantId, contactId);
 
-    await sendLocation(numberId, toJid, parseFloat(lat), parseFloat(lng), name || '');
+    const result = await sendLocation(numberId, toJid, parseFloat(lat), parseFloat(lng), name || '');
 
     await prisma.message.create({
       data: {
         tenantId: req.tenantId, numberId, contactId: safeContactId,
-        fromJid: `${number.phoneNumber}@s.whatsapp.net`, toJid,
+        fromJid: resolveFromJid(number, result), toJid,
         body: name || 'Location', type: 'location',
         latitude: parseFloat(lat), longitude: parseFloat(lng), locationName: name,
         direction: 'outbound', aiSent: false, timestamp: new Date(),
@@ -246,12 +250,12 @@ async function sendPollMsg(req, res, next) {
 
     const safeContactId = await resolveTenantContactId(req.tenantId, contactId);
 
-    await sendPoll(numberId, toJid, question, options, allowMultiple || false);
+    const result = await sendPoll(numberId, toJid, question, options, allowMultiple || false);
 
     await prisma.message.create({
       data: {
         tenantId: req.tenantId, numberId, contactId: safeContactId,
-        fromJid: `${number.phoneNumber}@s.whatsapp.net`, toJid,
+        fromJid: resolveFromJid(number, result), toJid,
         body: question, type: 'poll',
         direction: 'outbound', aiSent: false, timestamp: new Date(),
       },
