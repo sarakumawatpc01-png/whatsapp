@@ -33,9 +33,18 @@ async function initiateOAuth(req, res, next) {
 // ── OAUTH CALLBACK ────────────────────────────────────────────
 async function oauthCallback(req, res, next) {
   try {
-    const { code, state: tenantId } = req.query;
+    const { code, state } = req.query;
+    const tenantId = typeof state === 'string' ? state : null;
 
     if (!code || !tenantId) {
+      return res.redirect(`${process.env.FRONTEND_URL}/dashboard/calendar?error=oauth_failed`);
+    }
+
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { id: true, status: true },
+    });
+    if (!tenant || tenant.status === 'deleted') {
       return res.redirect(`${process.env.FRONTEND_URL}/dashboard/calendar?error=oauth_failed`);
     }
 
@@ -127,9 +136,12 @@ async function createAppointment(req, res, next) {
     const end   = new Date(endTime);
     if (end <= start) return next(new ValidationError('endTime must be after startTime'));
 
+    let safeContactId = null;
     let contact = null;
     if (contactId) {
       contact = await prisma.contact.findFirst({ where: { id: contactId, tenantId: req.tenantId } });
+      if (!contact) return next(new AppError('Contact not found', 404));
+      safeContactId = contact.id;
     }
 
     let calendarEventId = null;
@@ -152,7 +164,7 @@ async function createAppointment(req, res, next) {
     const appointment = await prisma.appointment.create({
       data: {
         tenantId:       req.tenantId,
-        contactId:      contactId || null,
+        contactId:      safeContactId,
         title,
         description:    description || null,
         startTime:      start,
