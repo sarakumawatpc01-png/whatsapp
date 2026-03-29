@@ -9,6 +9,16 @@ const {
 } = require('../whatsapp/engine');
 const { scheduledQueue } = require('../jobs/processors');
 
+async function resolveTenantContactId(tenantId, contactId) {
+  if (!contactId) return null;
+  const contact = await prisma.contact.findFirst({
+    where: { id: contactId, tenantId },
+    select: { id: true },
+  });
+  if (!contact) throw new AppError('Contact not found', 404);
+  return contact.id;
+}
+
 // ── GET MESSAGES FOR A CONTACT ────────────────────────────────
 async function getMessages(req, res, next) {
   try {
@@ -120,15 +130,7 @@ async function sendText(req, res, next) {
     });
     if (!number) return next(new AppError('Number not found', 404));
 
-    let safeContactId = null;
-    if (contactId) {
-      const contact = await prisma.contact.findFirst({
-        where: { id: contactId, tenantId: req.tenantId },
-        select: { id: true },
-      });
-      if (!contact) return next(new AppError('Contact not found', 404));
-      safeContactId = contact.id;
-    }
+    const safeContactId = await resolveTenantContactId(req.tenantId, contactId);
 
     const result = await sendTextMessage(numberId, toJid, message, quotedMsgId);
 
@@ -167,15 +169,7 @@ async function sendMedia(req, res, next) {
     });
     if (!number) return next(new AppError('Number not found', 404));
 
-    let safeContactId = null;
-    if (contactId) {
-      const contact = await prisma.contact.findFirst({
-        where: { id: contactId, tenantId: req.tenantId },
-        select: { id: true },
-      });
-      if (!contact) return next(new AppError('Contact not found', 404));
-      safeContactId = contact.id;
-    }
+    const safeContactId = await resolveTenantContactId(req.tenantId, contactId);
 
     const base64 = req.file.buffer.toString('base64');
     const mediaData = {
@@ -219,15 +213,7 @@ async function sendLocationMsg(req, res, next) {
     const number = await prisma.tenantNumber.findFirst({ where: { id: numberId, tenantId: req.tenantId } });
     if (!number) return next(new AppError('Number not found', 404));
 
-    let safeContactId = null;
-    if (contactId) {
-      const contact = await prisma.contact.findFirst({
-        where: { id: contactId, tenantId: req.tenantId },
-        select: { id: true },
-      });
-      if (!contact) return next(new AppError('Contact not found', 404));
-      safeContactId = contact.id;
-    }
+    const safeContactId = await resolveTenantContactId(req.tenantId, contactId);
 
     await sendLocation(numberId, toJid, parseFloat(lat), parseFloat(lng), name || '');
 
@@ -258,15 +244,7 @@ async function sendPollMsg(req, res, next) {
     const number = await prisma.tenantNumber.findFirst({ where: { id: numberId, tenantId: req.tenantId } });
     if (!number) return next(new AppError('Number not found', 404));
 
-    let safeContactId = null;
-    if (contactId) {
-      const contact = await prisma.contact.findFirst({
-        where: { id: contactId, tenantId: req.tenantId },
-        select: { id: true },
-      });
-      if (!contact) return next(new AppError('Contact not found', 404));
-      safeContactId = contact.id;
-    }
+    const safeContactId = await resolveTenantContactId(req.tenantId, contactId);
 
     await sendPoll(numberId, toJid, question, options, allowMultiple || false);
 
@@ -315,15 +293,7 @@ async function scheduleMessage(req, res, next) {
     const number = await prisma.tenantNumber.findFirst({ where: { id: numberId, tenantId: req.tenantId } });
     if (!number) return next(new AppError('Number not found', 404));
 
-    let safeContactId = null;
-    if (contactId) {
-      const contact = await prisma.contact.findFirst({
-        where: { id: contactId, tenantId: req.tenantId },
-        select: { id: true },
-      });
-      if (!contact) return next(new AppError('Contact not found', 404));
-      safeContactId = contact.id;
-    }
+    const safeContactId = await resolveTenantContactId(req.tenantId, contactId);
 
     const delay = scheduleTime.getTime() - Date.now();
 
