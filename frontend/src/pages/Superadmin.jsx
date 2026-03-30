@@ -13,6 +13,11 @@ export const SuperadminPage = () => {
     razorpay_webhook_secret: '',
   })
   const [error, setError] = useState('')
+  const keyLabels = {
+    razorpay_key_id: 'Razorpay key ID',
+    razorpay_key_secret: 'Razorpay key secret',
+    razorpay_webhook_secret: 'Razorpay webhook secret',
+  }
 
   const extractKeys = (res) => {
     const keysData = res.data?.data || res.data || {}
@@ -53,7 +58,7 @@ export const SuperadminPage = () => {
   const updateApiKey = async (key) => {
     const value = apiKeyInputs[key]?.trim()
     if (!value) {
-      setError(`Please enter a value for ${key.replace(/_/g, ' ')}`)
+      setError(`Please enter a value for ${keyLabels[key] || key.replace(/_/g, ' ')}`)
       return
     }
     try {

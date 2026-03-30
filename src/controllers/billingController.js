@@ -16,6 +16,10 @@ async function fetchRazorpayKeys() {
   return { keyId, keySecret };
 }
 
+async function fetchRazorpayKeySecret() {
+  return getSetting('razorpay_key_secret', { fallbackEnvKey: 'RAZORPAY_KEY_SECRET' });
+}
+
 // ── GET PLANS ─────────────────────────────────────────────────
 async function getPlans(req, res, next) {
   try {
@@ -76,9 +80,14 @@ async function createOrder(req, res, next) {
 
     const { keyId, keySecret } = await fetchRazorpayKeys();
     if (!keyId || !keySecret) {
+      const missing = [];
+      if (!keyId) missing.push('key ID');
+      if (!keySecret) missing.push('key secret');
       return next(
         new AppError(
-          'Razorpay credentials are missing. Configure them in superadmin settings or environment variables.',
+          `Razorpay ${missing.join(' and ')} ${
+            missing.length > 1 ? 'are' : 'is'
+          } missing. Configure them in superadmin settings or environment variables.`,
           500,
         ),
       );
@@ -119,7 +128,7 @@ async function verifyPayment(req, res, next) {
 
     // Verify signature
     const body      = `${razorpay_order_id}|${razorpay_payment_id}`;
-    const { keySecret } = await fetchRazorpayKeys();
+    const keySecret = await fetchRazorpayKeySecret();
     if (!keySecret) {
       return next(
         new AppError(

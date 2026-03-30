@@ -16,13 +16,17 @@ async function getSetting(key, { fallbackEnvKey, cacheTtlSeconds = 300 } = {}) {
   if (cached !== null) return cached;
 
   const setting = await prisma.globalSetting.findUnique({ where: { key } });
-  let value = setting?.value ?? null;
+  let value = setting?.value;
 
-  if (!value && fallbackEnvKey) {
+  if ((value === null || value === undefined) && fallbackEnvKey) {
     value = process.env[fallbackEnvKey] || null;
   }
 
-  if (value !== null) {
+  if (value === undefined) {
+    value = null;
+  }
+
+  if (value !== null && value !== undefined) {
     await cacheSet(cacheKey, value, cacheTtlSeconds);
   }
   return value;
