@@ -76,7 +76,12 @@ async function createOrder(req, res, next) {
 
     const { keyId, keySecret } = await getRazorpayCredentials();
     if (!keyId || !keySecret) {
-      return next(new AppError('Razorpay is not configured', 500));
+      return next(
+        new AppError(
+          'Razorpay credentials are missing. Configure them in superadmin settings or environment variables.',
+          500,
+        ),
+      );
     }
 
     const razorpay = new Razorpay({ key_id: keyId, key_secret: keySecret });
@@ -116,7 +121,12 @@ async function verifyPayment(req, res, next) {
     const body      = `${razorpay_order_id}|${razorpay_payment_id}`;
     const { keySecret } = await getRazorpayCredentials();
     if (!keySecret) {
-      return next(new AppError('Razorpay is not configured', 500));
+      return next(
+        new AppError(
+          'Razorpay key secret is missing. Configure it in superadmin settings or environment variables.',
+          500,
+        ),
+      );
     }
 
     const expected  = crypto

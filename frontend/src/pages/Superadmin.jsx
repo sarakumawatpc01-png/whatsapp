@@ -104,7 +104,9 @@ export const SuperadminPage = () => {
             className="form-input"
             placeholder="rzp_live_..."
             value={apiKeyInputs.razorpay_key_id}
-            onChange={(e) => setApiKeyInputs({ ...apiKeyInputs, razorpay_key_id: e.target.value })}
+            onChange={(e) =>
+              setApiKeyInputs((prev) => ({ ...prev, razorpay_key_id: e.target.value }))
+            }
           />
           <button className="btn btn-primary" onClick={() => updateApiKey('razorpay_key_id')}>
             Save Key ID
@@ -121,7 +123,7 @@ export const SuperadminPage = () => {
             type="password"
             value={apiKeyInputs.razorpay_key_secret}
             onChange={(e) =>
-              setApiKeyInputs({ ...apiKeyInputs, razorpay_key_secret: e.target.value })
+              setApiKeyInputs((prev) => ({ ...prev, razorpay_key_secret: e.target.value }))
             }
           />
           <button className="btn btn-primary" onClick={() => updateApiKey('razorpay_key_secret')}>
@@ -139,7 +141,7 @@ export const SuperadminPage = () => {
             type="password"
             value={apiKeyInputs.razorpay_webhook_secret}
             onChange={(e) =>
-              setApiKeyInputs({ ...apiKeyInputs, razorpay_webhook_secret: e.target.value })
+              setApiKeyInputs((prev) => ({ ...prev, razorpay_webhook_secret: e.target.value }))
             }
           />
           <button
