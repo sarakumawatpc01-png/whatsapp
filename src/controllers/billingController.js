@@ -5,12 +5,15 @@ const prisma   = require('../config/database');
 const { AppError, ValidationError } = require('../utils/errors');
 const { success, paginated } = require('../utils/response');
 const logger   = require('../config/logger');
+const { getSetting } = require('../services/settingsService');
 
-function getRazorpay() {
-  return new Razorpay({
-    key_id:     process.env.RAZORPAY_KEY_ID,
-    key_secret: process.env.RAZORPAY_KEY_SECRET,
-  });
+async function getRazorpayConfig() {
+  const [keyId, keySecret] = await Promise.all([
+    getSetting('razorpay_key_id', { fallbackEnvKey: 'RAZORPAY_KEY_ID' }),
+    getSetting('razorpay_key_secret', { fallbackEnvKey: 'RAZORPAY_KEY_SECRET' }),
+  ]);
+
+  return { keyId, keySecret };
 }
 
 // ── GET PLANS ─────────────────────────────────────────────────
@@ -71,7 +74,12 @@ async function createOrder(req, res, next) {
     if (!plan || !plan.isActive) return next(new AppError('Plan not found or inactive', 404));
     if (plan.price === 0) return next(new AppError('Free plan does not require payment', 400));
 
-    const razorpay = getRazorpay();
+    const { keyId, keySecret } = await getRazorpayConfig();
+    if (!keyId || !keySecret) {
+      return next(new AppError('Razorpay is not configured', 500));
+    }
+
+    const razorpay = new Razorpay({ key_id: keyId, key_secret: keySecret });
     const order = await razorpay.orders.create({
       amount:   plan.price,   // already in paise
       currency: 'INR',
@@ -88,7 +96,7 @@ async function createOrder(req, res, next) {
       currency: order.currency,
       planId,
       planName: plan.displayName,
-      keyId:    process.env.RAZORPAY_KEY_ID,
+      keyId,
     });
   } catch (err) {
     next(err);
@@ -106,8 +114,13 @@ async function verifyPayment(req, res, next) {
 
     // Verify signature
     const body      = `${razorpay_order_id}|${razorpay_payment_id}`;
+    const { keySecret } = await getRazorpayConfig();
+    if (!keySecret) {
+      return next(new AppError('Razorpay is not configured', 500));
+    }
+
     const expected  = crypto
-      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+      .createHmac('sha256', keySecret)
       .update(body)
       .digest('hex');
 
