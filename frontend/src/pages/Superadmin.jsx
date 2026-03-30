@@ -19,10 +19,7 @@ export const SuperadminPage = () => {
     razorpay_webhook_secret: 'Razorpay webhook secret',
   }
 
-  const extractApiKeysFromResponse = (res) => {
-    const keysData = res.data?.data || res.data || {}
-    return keysData.keys || {}
-  }
+  const extractApiKeysFromResponse = (res) => res.data?.data?.keys || {}
 
   const load = async () => {
     if (role !== 'superadmin') return

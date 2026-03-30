@@ -17,9 +17,7 @@ async function fetchRazorpayKeys() {
 }
 
 function buildMissingRazorpayMessage(missing) {
-  return `Razorpay credentials missing: ${missing.join(
-    ', ',
-  )}. Configure them in superadmin settings or environment variables.`;
+  return `Razorpay credentials missing: ${missing.join(', ')}. Configure them in superadmin settings or environment variables.`;
 }
 
 // ── GET PLANS ─────────────────────────────────────────────────
