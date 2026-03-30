@@ -19,7 +19,7 @@ export const SuperadminPage = () => {
     razorpay_webhook_secret: 'Razorpay webhook secret',
   }
 
-  const extractKeys = (res) => {
+  const extractApiKeysFromResponse = (res) => {
     const keysData = res.data?.data || res.data || {}
     return keysData.keys || {}
   }
@@ -35,7 +35,7 @@ export const SuperadminPage = () => {
       setStats(s.data?.data || s.data)
       const usersData = u.data?.data || u.data || {}
       setUsers(usersData.data || usersData)
-      setApiKeys(extractKeys(k))
+      setApiKeys(extractApiKeysFromResponse(k))
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load superadmin data')
     }
@@ -58,7 +58,7 @@ export const SuperadminPage = () => {
   const updateApiKey = async (key) => {
     const value = apiKeyInputs[key]?.trim()
     if (!value) {
-      setError(`Please enter a value for ${keyLabels[key]}`)
+      setError(`Please provide a value for ${keyLabels[key]} before saving`)
       return
     }
     try {
@@ -66,7 +66,7 @@ export const SuperadminPage = () => {
       setApiKeyInputs((prev) => ({ ...prev, [key]: '' }))
       setError('')
       const res = await api.get('/superadmin/api-keys')
-      setApiKeys(extractKeys(res))
+      setApiKeys(extractApiKeysFromResponse(res))
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to update API key')
     }
