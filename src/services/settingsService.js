@@ -17,6 +17,7 @@ async function getSetting(key, { fallbackEnvKey, cacheTtlSeconds = 300 } = {}) {
 
   const setting = await prisma.globalSetting.findUnique({ where: { key } });
   let value = setting?.value ?? null;
+  if (value === '') value = null;
 
   if (value === null && fallbackEnvKey) {
     value = process.env[fallbackEnvKey] || null;

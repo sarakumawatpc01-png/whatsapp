@@ -16,9 +16,6 @@ async function fetchRazorpayKeys() {
   return { keyId, keySecret };
 }
 
-function buildMissingRazorpayMessage(missing) {
-  return `Razorpay credentials missing: ${missing.join(', ')}. Configure them in superadmin settings or environment variables.`;
-}
 
 // ── GET PLANS ─────────────────────────────────────────────────
 async function getPlans(req, res, next) {
@@ -83,7 +80,14 @@ async function createOrder(req, res, next) {
       const missing = [];
       if (!keyId) missing.push('key ID');
       if (!keySecret) missing.push('key secret');
-      return next(new AppError(buildMissingRazorpayMessage(missing), 500));
+      return next(
+        new AppError(
+          `Razorpay credentials missing: ${missing.join(
+            ', ',
+          )}. Configure them in superadmin settings or environment variables.`,
+          500,
+        ),
+      );
     }
 
     const razorpay = new Razorpay({ key_id: keyId, key_secret: keySecret });
@@ -123,7 +127,12 @@ async function verifyPayment(req, res, next) {
     const body      = `${razorpay_order_id}|${razorpay_payment_id}`;
     const { keySecret } = await fetchRazorpayKeys();
     if (!keySecret) {
-      return next(new AppError(buildMissingRazorpayMessage(['key secret']), 500));
+      return next(
+        new AppError(
+          'Razorpay credentials missing: key secret. Configure them in superadmin settings or environment variables.',
+          500,
+        ),
+      );
     }
 
     const expected  = crypto
