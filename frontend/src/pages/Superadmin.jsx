@@ -14,6 +14,11 @@ export const SuperadminPage = () => {
   })
   const [error, setError] = useState('')
 
+  const extractKeys = (res) => {
+    const keysData = res.data?.data || res.data || {}
+    return keysData.keys || {}
+  }
+
   const load = async () => {
     if (role !== 'superadmin') return
     try {
@@ -25,8 +30,7 @@ export const SuperadminPage = () => {
       setStats(s.data?.data || s.data)
       const usersData = u.data?.data || u.data || {}
       setUsers(usersData.data || usersData)
-      const keysData = k.data?.data || k.data || {}
-      setApiKeys(keysData.keys || {})
+      setApiKeys(extractKeys(k))
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load superadmin data')
     }
@@ -49,7 +53,7 @@ export const SuperadminPage = () => {
   const updateApiKey = async (key) => {
     const value = apiKeyInputs[key]?.trim()
     if (!value) {
-      setError('Please enter a value for the API key')
+      setError(`Please enter a value for ${key.replace(/_/g, ' ')}`)
       return
     }
     try {
@@ -57,8 +61,7 @@ export const SuperadminPage = () => {
       setApiKeyInputs((prev) => ({ ...prev, [key]: '' }))
       setError('')
       const res = await api.get('/superadmin/api-keys')
-      const keysData = res.data?.data || res.data || {}
-      setApiKeys(keysData.keys || {})
+      setApiKeys(extractKeys(res))
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to update API key')
     }

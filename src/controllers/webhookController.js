@@ -17,8 +17,12 @@ async function handleRazorpayWebhook(req, res) {
   // Always respond 200 immediately — Razorpay retries if it doesn't get one quickly
   res.status(200).json({ received: true });
 
-  if (!signature || !secret) {
-    logger.warn('Razorpay webhook received without secret/signature — ignored');
+  if (!secret) {
+    logger.warn('Razorpay webhook received without configured secret — ignored');
+    return;
+  }
+  if (!signature) {
+    logger.warn('Razorpay webhook received without signature — ignored');
     return;
   }
 
