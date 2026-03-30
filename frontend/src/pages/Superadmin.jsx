@@ -112,10 +112,13 @@ export const SuperadminPage = () => {
         </div>
         <div className="form-group">
           <label className="form-label">Key Secret</label>
-          <div className="act-time">Current: {apiKeys.razorpay_key_secret || '—'}</div>
+          <div className="act-time">
+            Current: {apiKeys.razorpay_key_secret ? 'Configured' : '—'}
+          </div>
           <input
             className="form-input"
             placeholder="Razorpay key secret"
+            type="password"
             value={apiKeyInputs.razorpay_key_secret}
             onChange={(e) =>
               setApiKeyInputs({ ...apiKeyInputs, razorpay_key_secret: e.target.value })
@@ -127,10 +130,13 @@ export const SuperadminPage = () => {
         </div>
         <div className="form-group">
           <label className="form-label">Webhook Secret</label>
-          <div className="act-time">Current: {apiKeys.razorpay_webhook_secret || '—'}</div>
+          <div className="act-time">
+            Current: {apiKeys.razorpay_webhook_secret ? 'Configured' : '—'}
+          </div>
           <input
             className="form-input"
             placeholder="Razorpay webhook secret"
+            type="password"
             value={apiKeyInputs.razorpay_webhook_secret}
             onChange={(e) =>
               setApiKeyInputs({ ...apiKeyInputs, razorpay_webhook_secret: e.target.value })

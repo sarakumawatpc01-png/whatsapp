@@ -14,7 +14,9 @@ async function getSetting(key, { fallbackEnvKey, cacheTtlSeconds = 300 } = {}) {
     value = process.env[fallbackEnvKey] || null;
   }
 
-  await cacheSet(cacheKey, value, cacheTtlSeconds);
+  if (value !== null) {
+    await cacheSet(cacheKey, value, cacheTtlSeconds);
+  }
   return value;
 }
 

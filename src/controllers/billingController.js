@@ -7,7 +7,7 @@ const { success, paginated } = require('../utils/response');
 const logger   = require('../config/logger');
 const { getSetting } = require('../services/settingsService');
 
-async function getRazorpayConfig() {
+async function getRazorpayCredentials() {
   const [keyId, keySecret] = await Promise.all([
     getSetting('razorpay_key_id', { fallbackEnvKey: 'RAZORPAY_KEY_ID' }),
     getSetting('razorpay_key_secret', { fallbackEnvKey: 'RAZORPAY_KEY_SECRET' }),
@@ -74,7 +74,7 @@ async function createOrder(req, res, next) {
     if (!plan || !plan.isActive) return next(new AppError('Plan not found or inactive', 404));
     if (plan.price === 0) return next(new AppError('Free plan does not require payment', 400));
 
-    const { keyId, keySecret } = await getRazorpayConfig();
+    const { keyId, keySecret } = await getRazorpayCredentials();
     if (!keyId || !keySecret) {
       return next(new AppError('Razorpay is not configured', 500));
     }
@@ -114,7 +114,7 @@ async function verifyPayment(req, res, next) {
 
     // Verify signature
     const body      = `${razorpay_order_id}|${razorpay_payment_id}`;
-    const { keySecret } = await getRazorpayConfig();
+    const { keySecret } = await getRazorpayCredentials();
     if (!keySecret) {
       return next(new AppError('Razorpay is not configured', 500));
     }
