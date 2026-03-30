@@ -22,6 +22,7 @@ export const InboxPage = () => {
       const res = await api.get('/messages/conversations')
       const data = res.data?.data || res.data?.results || res.data
       setConversations(data?.data || data || [])
+      setError('')
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load inbox')
     }
@@ -34,6 +35,7 @@ export const InboxPage = () => {
       const res = await api.get(`/messages/contact/${contactId}?limit=50`)
       const data = res.data?.data || res.data?.results || res.data
       setMessages(data?.data || data || [])
+      setError('')
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load messages')
     } finally {
@@ -69,6 +71,7 @@ export const InboxPage = () => {
       })
       setMessageText('')
       await loadMessages(selected.id)
+      setError('')
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to send message')
     }
@@ -79,6 +82,7 @@ export const InboxPage = () => {
     try {
       const res = await api.post(`/messages/ai/suggestion/${selected.id}`)
       setAiSuggestion(res.data?.data?.suggestion || res.data?.suggestion || '')
+      setError('')
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to fetch suggestion')
     }
@@ -88,6 +92,7 @@ export const InboxPage = () => {
     <div id="inbox-page" className="page active">
       <div className="inbox-shell">
         <div className="cl-panel">
+          {error && <div className="badge red">{error}</div>}
           <div className="cl-top">
             <div className="cl-top-row">
               <div className="cl-heading">Conversations</div>

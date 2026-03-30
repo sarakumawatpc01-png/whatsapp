@@ -705,7 +705,7 @@ async function getApiKeys(req, res, next) {
             'deepseek_api_key', 'sarvam_api_key',
             'sendgrid_api_key', 'twilio_account_sid',
             'twilio_auth_token', 'twilio_phone',
-            'razorpay_key_id', 'razorpay_key_secret',
+            'razorpay_key_id', 'razorpay_key_secret', 'razorpay_webhook_secret',
             'google_client_id', 'google_client_secret',
           ],
         },
@@ -736,7 +736,8 @@ async function updateApiKey(req, res, next) {
     const allowedKeys = [
       'anthropic_api_key', 'openai_api_key', 'deepseek_api_key', 'sarvam_api_key',
       'sendgrid_api_key', 'twilio_account_sid', 'twilio_auth_token', 'twilio_phone',
-      'razorpay_key_id', 'razorpay_key_secret', 'google_client_id', 'google_client_secret',
+      'razorpay_key_id', 'razorpay_key_secret', 'razorpay_webhook_secret',
+      'google_client_id', 'google_client_secret',
     ];
     if (!allowedKeys.includes(key)) return next(new AppError(`Unknown key: ${key}`, 400));
 

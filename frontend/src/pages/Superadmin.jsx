@@ -6,15 +6,33 @@ export const SuperadminPage = () => {
   const { api, role } = useAuth()
   const [stats, setStats] = useState(null)
   const [users, setUsers] = useState([])
+  const [apiKeys, setApiKeys] = useState({})
+  const [apiKeyInputs, setApiKeyInputs] = useState({
+    razorpay_key_id: '',
+    razorpay_key_secret: '',
+    razorpay_webhook_secret: '',
+  })
   const [error, setError] = useState('')
+  const keyLabels = {
+    razorpay_key_id: 'Razorpay key ID',
+    razorpay_key_secret: 'Razorpay key secret',
+    razorpay_webhook_secret: 'Razorpay webhook secret',
+  }
+
+  const extractRazorpayKeysFromResponse = (res) => res.data?.data?.keys || {}
 
   const load = async () => {
     if (role !== 'superadmin') return
     try {
-      const [s, u] = await Promise.all([api.get('/superadmin/stats'), api.get('/superadmin/users')])
+      const [s, u, k] = await Promise.all([
+        api.get('/superadmin/stats'),
+        api.get('/superadmin/users'),
+        api.get('/superadmin/api-keys'),
+      ])
       setStats(s.data?.data || s.data)
       const usersData = u.data?.data || u.data || {}
       setUsers(usersData.data || usersData)
+      setApiKeys(extractRazorpayKeysFromResponse(k))
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load superadmin data')
     }
@@ -32,6 +50,23 @@ export const SuperadminPage = () => {
   const unsuspend = async (id) => {
     await api.post(`/superadmin/users/${id}/unsuspend`)
     load()
+  }
+
+  const updateApiKey = async (key) => {
+    setError('')
+    const value = apiKeyInputs[key]?.trim()
+    if (!value) {
+      setError(`Please provide a value for ${keyLabels[key]} before saving`)
+      return
+    }
+    try {
+      await api.patch('/superadmin/api-keys', { key, value })
+      setApiKeyInputs((prev) => ({ ...prev, [key]: '' }))
+      const res = await api.get('/superadmin/api-keys')
+      setApiKeys(extractRazorpayKeysFromResponse(res))
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to update API key')
+    }
   }
 
   if (role !== 'superadmin') {
@@ -63,6 +98,63 @@ export const SuperadminPage = () => {
             <div className="kpi-val">{stats?.totalRevenuePaise ? stats.totalRevenuePaise / 100 : 0}</div>
             <div className="kpi-label">Revenue</div>
           </div>
+        </div>
+      </Card>
+
+      <Card title="Payment Gateway (Razorpay)">
+        <div className="form-group">
+          <label className="form-label">Key ID</label>
+          <div className="act-time">Current: {apiKeys.razorpay_key_id || '—'}</div>
+          <input
+            className="form-input"
+            placeholder="rzp_live_..."
+            value={apiKeyInputs.razorpay_key_id}
+            onChange={(e) =>
+              setApiKeyInputs((prev) => ({ ...prev, razorpay_key_id: e.target.value }))
+            }
+          />
+          <button className="btn btn-primary" onClick={() => updateApiKey('razorpay_key_id')}>
+            Save Key ID
+          </button>
+        </div>
+        <div className="form-group">
+          <label className="form-label">Key Secret</label>
+          <div className="act-time">
+            Current: {apiKeys.razorpay_key_secret ? 'Configured' : '—'}
+          </div>
+          <input
+            className="form-input"
+            placeholder="Razorpay key secret"
+            type="password"
+            value={apiKeyInputs.razorpay_key_secret}
+            onChange={(e) =>
+              setApiKeyInputs((prev) => ({ ...prev, razorpay_key_secret: e.target.value }))
+            }
+          />
+          <button className="btn btn-primary" onClick={() => updateApiKey('razorpay_key_secret')}>
+            Save Key Secret
+          </button>
+        </div>
+        <div className="form-group">
+          <label className="form-label">Webhook Secret</label>
+          <div className="act-time">
+            Current: {apiKeys.razorpay_webhook_secret ? 'Configured' : '—'}
+          </div>
+          <input
+            className="form-input"
+            placeholder="Razorpay webhook secret"
+            type="password"
+            value={apiKeyInputs.razorpay_webhook_secret}
+            onChange={(e) =>
+              setApiKeyInputs((prev) => ({ ...prev, razorpay_webhook_secret: e.target.value }))
+            }
+          />
+          <button
+            className="btn btn-primary"
+            onClick={() => updateApiKey('razorpay_webhook_secret')}
+          >
+            Save Webhook Secret
+          </button>
         </div>
       </Card>
 

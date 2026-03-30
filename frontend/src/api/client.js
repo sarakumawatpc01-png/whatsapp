@@ -51,7 +51,7 @@ export const createApiClient = ({ getTokens, role, onTokens, onLogout }) => {
             originalRequest.headers.Authorization = `Bearer ${newAccess}`
             return instance(originalRequest)
           }
-        } catch (refreshErr) {
+        } catch {
           onLogout?.()
         }
       }

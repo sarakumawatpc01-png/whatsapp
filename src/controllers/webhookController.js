@@ -4,18 +4,25 @@
 const crypto  = require('crypto');
 const prisma  = require('../config/database');
 const logger  = require('../config/logger');
+const { getSetting } = require('../services/settingsService');
 
 // ── RAZORPAY WEBHOOK ──────────────────────────────────────────
 // Raw body is passed by Express (configured in app.js for /api/webhooks)
 async function handleRazorpayWebhook(req, res) {
   const signature = req.headers['x-razorpay-signature'];
-  const secret    = process.env.RAZORPAY_WEBHOOK_SECRET;
+  const secret    = await getSetting('razorpay_webhook_secret', {
+    fallbackEnvKey: 'RAZORPAY_WEBHOOK_SECRET',
+  });
 
   // Always respond 200 immediately — Razorpay retries if it doesn't get one quickly
   res.status(200).json({ received: true });
 
-  if (!signature || !secret) {
-    logger.warn('Razorpay webhook received without secret/signature — ignored');
+  if (!secret) {
+    logger.warn('Razorpay webhook received without configured secret — ignored');
+    return;
+  }
+  if (!signature) {
+    logger.warn('Razorpay webhook received without signature — ignored');
     return;
   }
 
