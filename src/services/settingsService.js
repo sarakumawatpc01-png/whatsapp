@@ -26,7 +26,7 @@ async function getSetting(key, { fallbackEnvKey, cacheTtlSeconds = 300 } = {}) {
     value = null;
   }
 
-  if (value !== null && value !== undefined) {
+  if (value !== null) {
     await cacheSet(cacheKey, value, cacheTtlSeconds);
   }
   return value;

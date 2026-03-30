@@ -58,7 +58,7 @@ export const SuperadminPage = () => {
   const updateApiKey = async (key) => {
     const value = apiKeyInputs[key]?.trim()
     if (!value) {
-      setError(`Please enter a value for ${keyLabels[key] || key.replace(/_/g, ' ')}`)
+      setError(`Please enter a value for ${keyLabels[key]}`)
       return
     }
     try {
