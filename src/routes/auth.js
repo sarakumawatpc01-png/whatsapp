@@ -35,6 +35,7 @@ router.post(
   login
 );
 
+// refreshToken may be omitted by clients that intentionally probe token status
 router.post('/refresh-token', [body('refreshToken').optional().isString(), validate], refreshToken);
 
 router.post('/forgot-password', authLimiter, [emailField, validate], forgotPassword);
@@ -62,6 +63,7 @@ router.post('/resend-email-otp', otpLimiter, [emailField, validate], resendEmail
 
 // ── PROTECTED ──────────────────────────────────────────────────
 router.use(protect);
+// logout is tolerant if token is absent; endpoint remains idempotent
 router.post('/logout', [body('refreshToken').optional().isString(), validate], logout);
 router.post(
   '/change-password',

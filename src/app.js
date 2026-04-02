@@ -6,7 +6,6 @@ const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const morgan = require('morgan');
-const cookieParser = require('cookie-parser');
 
 const prisma = require('./config/database');
 const { initSocket } = require('./socket/socketManager');
@@ -66,7 +65,6 @@ app.use(cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 }));
-app.use(cookieParser());
 app.use(apiLimiter);
 
 // Webhooks need raw body

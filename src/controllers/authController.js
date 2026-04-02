@@ -212,13 +212,6 @@ async function login(req, res, next) {
 
     logger.info(`Tenant login: ${email}`);
 
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-
     return success(res, {
       accessToken,
       tenant: {
@@ -242,7 +235,7 @@ async function login(req, res, next) {
 // ── REFRESH TOKEN ─────────────────────────────────────────────
 async function refreshToken(req, res, next) {
   try {
-    const token = req.cookies?.refreshToken || req.body?.refreshToken;
+    const token = req.body?.refreshToken;
     if (!token) return next(new AppError('Refresh token required', 401));
 
     const record = await prisma.refreshToken.findUnique({ where: { token } });
@@ -270,13 +263,6 @@ async function refreshToken(req, res, next) {
       },
     });
 
-    res.cookie('refreshToken', newRefreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-
     return success(res, { accessToken }, 'Token refreshed');
   } catch (err) {
     next(err);
@@ -286,11 +272,10 @@ async function refreshToken(req, res, next) {
 // ── LOGOUT ────────────────────────────────────────────────────
 async function logout(req, res, next) {
   try {
-    const token = req.cookies?.refreshToken || req.body?.refreshToken;
+    const token = req.body?.refreshToken;
     if (token) {
       await prisma.refreshToken.deleteMany({ where: { token } }).catch(() => {});
     }
-    res.clearCookie('refreshToken');
     return success(res, {}, 'Logged out successfully');
   } catch (err) {
     next(err);
