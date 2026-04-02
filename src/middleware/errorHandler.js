@@ -1,4 +1,3 @@
-// src/middleware/errorHandler.js
 const logger = require('../config/logger');
 
 function errorHandler(err, req, res, next) {
@@ -22,10 +21,15 @@ function errorHandler(err, req, res, next) {
     message = 'Invalid token';
   }
 
+  const routeKey = `${req.method} ${req.path}`;
+
   if (process.env.NODE_ENV === 'development') {
-    logger.error(`[${statusCode}] ${req.method} ${req.path}: ${message}`, err.stack);
+    logger.error(`[${statusCode}] ${routeKey}: ${message}`, err.stack);
+  } else if (statusCode >= 500) {
+    logger.error(`[500] ${routeKey}:`, err);
+    message = 'Internal Server Error';
   } else {
-    if (statusCode === 500) logger.error(`[500] ${req.method} ${req.path}:`, err);
+    logger.warn(`[${statusCode}] ${routeKey}: ${message}`);
   }
 
   res.status(statusCode).json({

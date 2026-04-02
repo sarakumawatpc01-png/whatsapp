@@ -5,10 +5,23 @@ const logger = require('../config/logger');
 
 let io;
 
+function parseSocketAllowedOrigins() {
+  const explicitOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(Boolean);
+
+  if (explicitOrigins.length) return explicitOrigins;
+  if (process.env.FRONTEND_URL) return [process.env.FRONTEND_URL];
+  return ['http://localhost:3000'];
+}
+
 function initSocket(server) {
+  const allowedOrigins = parseSocketAllowedOrigins();
+
   io = new Server(server, {
     cors: {
-      origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+      origin: allowedOrigins,
       methods: ['GET', 'POST'],
       credentials: true,
     },
