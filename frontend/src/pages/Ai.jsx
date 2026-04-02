@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { Card } from '../components/common/Card'
 
@@ -10,7 +10,7 @@ export const AiPage = () => {
   const [testResponse, setTestResponse] = useState('')
   const [error, setError] = useState('')
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const [cfg, documents] = await Promise.all([api.get('/ai/config'), api.get('/ai/docs')])
       setConfig(cfg.data?.data || cfg.data)
@@ -18,11 +18,11 @@ export const AiPage = () => {
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load AI settings')
     }
-  }
+  }, [api])
 
   useEffect(() => {
     load()
-  }, [])
+  }, [load])
 
   const saveConfig = async (e) => {
     e.preventDefault()

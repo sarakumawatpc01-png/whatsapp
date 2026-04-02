@@ -1,7 +1,8 @@
-// src/routes/affiliate.js
 const router = require('express').Router();
+const { body } = require('express-validator');
 const { protectAffiliate } = require('../middleware/auth');
 const { authLimiter } = require('../middleware/rateLimiter');
+const { validate } = require('../utils/requestValidation');
 const {
   affiliateLogin, affiliateRefresh,
   getDashboard, getReferrals, getEarnings,
@@ -9,8 +10,17 @@ const {
 } = require('../controllers/affiliateController');
 
 // ── PUBLIC ─────────────────────────────────────────────────────
-router.post('/login',   authLimiter, affiliateLogin);
-router.post('/refresh', affiliateRefresh);
+router.post(
+  '/login',
+  authLimiter,
+  [
+    body('email').isEmail().withMessage('Valid email is required').normalizeEmail(),
+    body('password').isString().notEmpty().withMessage('Password is required'),
+    validate,
+  ],
+  affiliateLogin
+);
+router.post('/refresh', [body('refreshToken').isString().notEmpty().withMessage('refreshToken is required'), validate], affiliateRefresh);
 
 // ── PROTECTED ──────────────────────────────────────────────────
 router.use(protectAffiliate);

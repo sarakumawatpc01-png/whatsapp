@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { Card } from '../components/common/Card'
 
@@ -9,7 +9,7 @@ export const AnalyticsPage = () => {
   const [messagesByDay, setMessagesByDay] = useState([])
   const [error, setError] = useState('')
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const [rt, lb, msg] = await Promise.all([
         api.get('/analytics/response-times'),
@@ -22,11 +22,11 @@ export const AnalyticsPage = () => {
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load analytics')
     }
-  }
+  }, [api])
 
   useEffect(() => {
     load()
-  }, [])
+  }, [load])
 
   return (
     <div className="page active">

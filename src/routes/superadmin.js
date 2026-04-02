@@ -1,7 +1,8 @@
-// src/routes/superadmin.js
 const router = require('express').Router();
+const { body } = require('express-validator');
 const { protectSuperAdmin } = require('../middleware/auth');
-const { authLimiter } = require('../middleware/rateLimiter');
+const { adminAuthLimiter, adminApiLimiter } = require('../middleware/rateLimiter');
+const { validate } = require('../utils/requestValidation');
 const {
   superAdminLogin, superAdminRefresh,
   // Dashboard
@@ -38,11 +39,20 @@ const {
 } = require('../controllers/superadminController');
 
 // ── PUBLIC: Superadmin login ───────────────────────────────────
-router.post(`/${process.env.SUPERADMIN_SLUG || 'priyanshu'}/login`, authLimiter, superAdminLogin);
-router.post('/refresh',   superAdminRefresh);
+router.post(
+  `/${process.env.SUPERADMIN_SLUG || 'priyanshu'}/login`,
+  adminAuthLimiter,
+  [
+    body('email').isEmail().withMessage('Valid email is required').normalizeEmail(),
+    body('password').isString().notEmpty().withMessage('Password is required'),
+    validate,
+  ],
+  superAdminLogin
+);
+router.post('/refresh', [body('refreshToken').isString().notEmpty().withMessage('refreshToken is required'), validate], superAdminRefresh);
 
 // ── All routes below require superadmin JWT ────────────────────
-router.use(protectSuperAdmin);
+router.use(protectSuperAdmin, adminApiLimiter);
 
 // ── DASHBOARD ────────────────────────────────────────────────
 router.get('/stats',                        getPlatformStats);

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { Card } from '../components/common/Card'
 
@@ -13,7 +13,7 @@ export const CampaignsPage = () => {
   })
   const [error, setError] = useState('')
 
-  const loadCampaigns = async () => {
+  const loadCampaigns = useCallback(async () => {
     try {
       const res = await api.get('/campaigns')
       const data = res.data?.data || res.data
@@ -21,11 +21,11 @@ export const CampaignsPage = () => {
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load campaigns')
     }
-  }
+  }, [api])
 
   useEffect(() => {
     loadCampaigns()
-  }, [])
+  }, [loadCampaigns])
 
   const handleCreate = async (e) => {
     e.preventDefault()

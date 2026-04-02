@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { Card } from '../components/common/Card'
 
@@ -15,7 +15,7 @@ export const FollowupsPage = () => {
   })
   const [error, setError] = useState('')
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const res = await api.get('/followups')
       const data = res.data?.data || res.data
@@ -23,11 +23,11 @@ export const FollowupsPage = () => {
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load followups')
     }
-  }
+  }, [api])
 
   useEffect(() => {
     load()
-  }, [])
+  }, [load])
 
   const handleCreate = async (e) => {
     e.preventDefault()

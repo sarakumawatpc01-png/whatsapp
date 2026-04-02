@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { Card } from '../components/common/Card'
 
@@ -21,7 +21,7 @@ export const SuperadminPage = () => {
 
   const extractRazorpayKeysFromResponse = (res) => res.data?.data?.keys || {}
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (role !== 'superadmin') return
     try {
       const [s, u, k] = await Promise.all([
@@ -36,11 +36,11 @@ export const SuperadminPage = () => {
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load superadmin data')
     }
-  }
+  }, [api, role])
 
   useEffect(() => {
     load()
-  }, [role])
+  }, [load])
 
   const suspend = async (id) => {
     await api.post(`/superadmin/users/${id}/suspend`)

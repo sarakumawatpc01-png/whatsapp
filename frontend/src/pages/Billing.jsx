@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { Card } from '../components/common/Card'
 
@@ -8,7 +8,7 @@ export const BillingPage = () => {
   const [subscription, setSubscription] = useState(null)
   const [error, setError] = useState('')
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const [p, s] = await Promise.all([api.get('/billing/plans'), api.get('/billing/subscription')])
       setPlans(p.data?.data || p.data || [])
@@ -16,11 +16,11 @@ export const BillingPage = () => {
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load billing')
     }
-  }
+  }, [api])
 
   useEffect(() => {
     load()
-  }, [])
+  }, [load])
 
   const createOrder = async (planId) => {
     try {

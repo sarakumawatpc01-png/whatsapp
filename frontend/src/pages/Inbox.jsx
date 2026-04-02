@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { useAuth } from '../context/AuthContext'
@@ -17,7 +17,7 @@ export const InboxPage = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const loadConversations = async () => {
+  const loadConversations = useCallback(async () => {
     try {
       const res = await api.get('/messages/conversations')
       const data = res.data?.data || res.data?.results || res.data
@@ -26,7 +26,7 @@ export const InboxPage = () => {
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load inbox')
     }
-  }
+  }, [api])
 
   const loadMessages = async (contactId) => {
     if (!contactId) return
@@ -45,7 +45,7 @@ export const InboxPage = () => {
 
   useEffect(() => {
     loadConversations()
-  }, [])
+  }, [loadConversations])
 
   useEffect(() => {
     if (!socket) return
@@ -58,7 +58,7 @@ export const InboxPage = () => {
     return () => {
       socket?.off('message:new')
     }
-  }, [socket, selected])
+  }, [socket, selected, loadConversations])
 
   const handleSend = async () => {
     if (!messageText.trim() || !selected) return

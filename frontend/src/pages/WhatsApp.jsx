@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { Card } from '../components/common/Card'
 
@@ -9,7 +9,7 @@ export const WhatsAppPage = () => {
   const [error, setError] = useState('')
   const [newNumber, setNewNumber] = useState({ phoneNumber: '', label: '' })
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const res = await api.get('/whatsapp')
       const data = res.data?.data || res.data
@@ -17,11 +17,11 @@ export const WhatsAppPage = () => {
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load numbers')
     }
-  }
+  }, [api])
 
   useEffect(() => {
     load()
-  }, [])
+  }, [load])
 
   const addNumber = async (e) => {
     e.preventDefault()

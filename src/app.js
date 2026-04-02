@@ -7,10 +7,12 @@ const helmet = require('helmet');
 const compression = require('compression');
 const morgan = require('morgan');
 
+const prisma = require('./config/database');
 const { initSocket } = require('./socket/socketManager');
-const { initRedis } = require('./config/redis');
+const { initRedis, getRedis } = require('./config/redis');
 const { initWAEngine } = require('./whatsapp/engine');
 const { startJobProcessors } = require('./jobs/processors');
+const { apiLimiter } = require('./middleware/rateLimiter');
 const logger = require('./config/logger');
 const errorHandler = require('./middleware/errorHandler');
 
@@ -36,19 +38,39 @@ const webhookRoutes     = require('./routes/webhooks');
 const app = express();
 const server = http.createServer(app);
 
+function parseAllowedOrigins() {
+  const explicitOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(Boolean);
+
+  if (explicitOrigins.length) return explicitOrigins;
+  if (process.env.FRONTEND_URL) return [process.env.FRONTEND_URL];
+  return ['http://localhost:3000'];
+}
+
+const allowedOrigins = parseAllowedOrigins();
+
+function corsOriginValidator(origin, callback) {
+  if (!origin) return callback(null, true); // non-browser clients
+  if (allowedOrigins.includes(origin)) return callback(null, true);
+  return callback(new Error('Origin not allowed by CORS'));
+}
+
 // ── MIDDLEWARE ────────────────────────────────────────────────
-app.use(helmet({ contentSecurityPolicy: false }));
+app.use(helmet());
 app.use(compression());
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: corsOriginValidator,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 }));
+app.use(apiLimiter);
 
 // Webhooks need raw body
-app.use('/api/webhooks', express.raw({ type: 'application/json' }));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use('/api/webhooks', express.raw({ type: 'application/json', limit: '2mb' }));
+app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: process.env.URLENCODED_BODY_LIMIT || '1mb' }));
 app.use(morgan('combined', { stream: { write: msg => logger.info(msg.trim()) } }));
 
 // ── ROUTES ────────────────────────────────────────────────────
@@ -71,11 +93,30 @@ app.use('/api/affiliate',     affiliateRoutes);
 app.use('/api/webhooks',      webhookRoutes);
 
 // Health check
-app.get('/health', (req, res) => res.json({
-  status: 'ok',
-  timestamp: new Date().toISOString(),
-  version: process.env.npm_package_version || '1.0.0',
-}));
+app.get('/health', async (req, res) => {
+  const checks = { db: false, redis: false };
+
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    checks.db = true;
+  } catch (_) {}
+
+  try {
+    const redis = getRedis();
+    const pong = await redis.ping();
+    checks.redis = pong === 'PONG';
+  } catch (_) {
+    checks.redis = false;
+  }
+
+  const healthy = checks.db && checks.redis;
+  return res.status(healthy ? 200 : 503).json({
+    status: healthy ? 'ok' : 'degraded',
+    checks,
+    timestamp: new Date().toISOString(),
+    version: process.env.npm_package_version || '1.0.0',
+  });
+});
 
 // ── ERROR HANDLER ─────────────────────────────────────────────
 app.use(errorHandler);
@@ -111,11 +152,33 @@ async function boot() {
   }
 }
 
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  logger.info('SIGTERM received, shutting down gracefully...');
-  server.close(() => process.exit(0));
-});
+async function shutdown(signal) {
+  logger.info(`${signal} received, shutting down gracefully...`);
+
+  await new Promise(resolve => {
+    server.close(() => resolve());
+  });
+
+  try {
+    await prisma.$disconnect();
+  } catch (err) {
+    logger.error('Error while disconnecting database:', err.message);
+  }
+
+  try {
+    const redis = getRedis();
+    if (redis?.isOpen) {
+      await redis.quit();
+    }
+  } catch (err) {
+    logger.error('Error while disconnecting redis:', err.message);
+  }
+
+  process.exit(0);
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 process.on('uncaughtException', (err) => {
   logger.error('Uncaught exception:', err);
