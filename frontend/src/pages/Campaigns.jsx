@@ -25,7 +25,7 @@ export const CampaignsPage = () => {
 
   useEffect(() => {
     loadCampaigns()
-  }, [])
+  }, [loadCampaigns])
 
   const handleCreate = async (e) => {
     e.preventDefault()

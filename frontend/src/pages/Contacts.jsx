@@ -25,7 +25,7 @@ export const ContactsPage = () => {
 
   useEffect(() => {
     loadContacts()
-  }, [])
+  }, [loadContacts])
 
   const handleCreate = async (e) => {
     e.preventDefault()

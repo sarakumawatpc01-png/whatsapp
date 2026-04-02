@@ -45,7 +45,7 @@ export const InboxPage = () => {
 
   useEffect(() => {
     loadConversations()
-  }, [])
+  }, [loadConversations])
 
   useEffect(() => {
     if (!socket) return
@@ -58,7 +58,7 @@ export const InboxPage = () => {
     return () => {
       socket?.off('message:new')
     }
-  }, [socket, selected])
+  }, [socket, selected, loadConversations])
 
   const handleSend = async () => {
     if (!messageText.trim() || !selected) return

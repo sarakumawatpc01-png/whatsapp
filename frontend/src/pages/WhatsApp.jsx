@@ -21,7 +21,7 @@ export const WhatsAppPage = () => {
 
   useEffect(() => {
     load()
-  }, [])
+  }, [load])
 
   const addNumber = async (e) => {
     e.preventDefault()

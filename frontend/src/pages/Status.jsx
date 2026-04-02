@@ -20,7 +20,7 @@ export const StatusPage = () => {
 
   useEffect(() => {
     load()
-  }, [])
+  }, [load])
 
   const publish = async () => {
     try {

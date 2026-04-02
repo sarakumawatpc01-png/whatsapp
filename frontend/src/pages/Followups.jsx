@@ -27,7 +27,7 @@ export const FollowupsPage = () => {
 
   useEffect(() => {
     load()
-  }, [])
+  }, [load])
 
   const handleCreate = async (e) => {
     e.preventDefault()

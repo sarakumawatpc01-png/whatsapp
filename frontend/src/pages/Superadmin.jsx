@@ -40,7 +40,7 @@ export const SuperadminPage = () => {
 
   useEffect(() => {
     load()
-  }, [role])
+  }, [load])
 
   const suspend = async (id) => {
     await api.post(`/superadmin/users/${id}/suspend`)

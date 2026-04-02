@@ -32,7 +32,7 @@ export const CalendarPage = () => {
 
   useEffect(() => {
     load()
-  }, [])
+  }, [load])
 
   const connect = () => {
     window.location.href = `${api.defaults.baseURL.replace('/api', '')}/api/calendar/auth`

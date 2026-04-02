@@ -26,7 +26,7 @@ export const AnalyticsPage = () => {
 
   useEffect(() => {
     load()
-  }, [])
+  }, [load])
 
   return (
     <div className="page active">

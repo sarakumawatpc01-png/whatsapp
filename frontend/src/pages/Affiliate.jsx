@@ -27,7 +27,7 @@ export const AffiliatePage = () => {
 
   useEffect(() => {
     load()
-  }, [role])
+  }, [load])
 
   const requestPayout = async () => {
     await api.post('/affiliate/payout/request')

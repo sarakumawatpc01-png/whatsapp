@@ -22,7 +22,7 @@ export const AiPage = () => {
 
   useEffect(() => {
     load()
-  }, [])
+  }, [load])
 
   const saveConfig = async (e) => {
     e.preventDefault()

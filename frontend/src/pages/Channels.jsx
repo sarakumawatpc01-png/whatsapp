@@ -21,7 +21,7 @@ export const ChannelsPage = () => {
 
   useEffect(() => {
     load()
-  }, [])
+  }, [load])
 
   const createChannel = async (e) => {
     e.preventDefault()

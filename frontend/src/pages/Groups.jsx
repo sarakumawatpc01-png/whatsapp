@@ -20,7 +20,7 @@ export const GroupsPage = () => {
 
   useEffect(() => {
     load()
-  }, [])
+  }, [load])
 
   const create = async (e) => {
     e.preventDefault()

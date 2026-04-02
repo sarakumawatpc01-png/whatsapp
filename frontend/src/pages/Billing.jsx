@@ -20,7 +20,7 @@ export const BillingPage = () => {
 
   useEffect(() => {
     load()
-  }, [])
+  }, [load])
 
   const createOrder = async (planId) => {
     try {
