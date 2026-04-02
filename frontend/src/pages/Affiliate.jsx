@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { Card } from '../components/common/Card'
 
@@ -9,7 +9,7 @@ export const AffiliatePage = () => {
   const [earnings, setEarnings] = useState(null)
   const [error, setError] = useState('')
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (role !== 'affiliate') return
     try {
       const [d, r, e] = await Promise.all([
@@ -23,7 +23,7 @@ export const AffiliatePage = () => {
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load affiliate data')
     }
-  }
+  }, [api, role])
 
   useEffect(() => {
     load()

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { Card } from '../components/common/Card'
 
@@ -8,7 +8,7 @@ export const GroupsPage = () => {
   const [form, setForm] = useState({ subject: '', description: '' })
   const [error, setError] = useState('')
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const res = await api.get('/groups')
       const data = res.data?.data || res.data || []
@@ -16,7 +16,7 @@ export const GroupsPage = () => {
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load groups')
     }
-  }
+  }, [api])
 
   useEffect(() => {
     load()

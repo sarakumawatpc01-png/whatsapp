@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { Card } from '../components/common/Card'
 
@@ -15,7 +15,7 @@ export const CalendarPage = () => {
   })
   const [error, setError] = useState('')
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const [st, ev, appt] = await Promise.all([
         api.get('/calendar/status'),
@@ -28,7 +28,7 @@ export const CalendarPage = () => {
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load calendar')
     }
-  }
+  }, [api])
 
   useEffect(() => {
     load()

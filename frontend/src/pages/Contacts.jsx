@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { Card } from '../components/common/Card'
 
@@ -10,7 +10,7 @@ export const ContactsPage = () => {
   const [error, setError] = useState('')
   const [importing, setImporting] = useState(false)
 
-  const loadContacts = async () => {
+  const loadContacts = useCallback(async () => {
     setLoading(true)
     try {
       const res = await api.get('/contacts?limit=50')
@@ -21,7 +21,7 @@ export const ContactsPage = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [api])
 
   useEffect(() => {
     loadContacts()
