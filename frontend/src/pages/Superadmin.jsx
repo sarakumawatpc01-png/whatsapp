@@ -13,6 +13,7 @@ const safeList = (res) => {
 }
 
 const parseError = (err, fallback) => err?.response?.data?.error || err?.response?.data?.message || fallback
+const formatPrice = (amountPaise) => `₹${(amountPaise || 0) / 100}`
 
 const apiKeyDefs = [
   { key: 'anthropic_api_key', label: 'Anthropic API Key' },
@@ -122,22 +123,28 @@ export const SuperadminPage = () => {
   }, [search, users])
 
   const hydrateUserEditors = useCallback((userList) => {
+    const computedPlans = {}
+    const computedPkg = {}
+    userList.forEach((u) => {
+      computedPlans[u.id] = u.planId || ''
+      computedPkg[u.id] = {
+        buttonsEnabled: Boolean(u.buttonsEnabled),
+        listsEnabled: Boolean(u.listsEnabled),
+      }
+    })
+
     setUserPlanSelection((prev) => {
       const next = { ...prev }
-      userList.forEach((u) => {
-        if (!next[u.id]) next[u.id] = u.planId || ''
+      Object.entries(computedPlans).forEach(([id, planId]) => {
+        if (!next[id]) next[id] = planId
       })
       return next
     })
+
     setUserPkgConfig((prev) => {
       const next = { ...prev }
-      userList.forEach((u) => {
-        if (!next[u.id]) {
-          next[u.id] = {
-            buttonsEnabled: Boolean(u.buttonsEnabled),
-            listsEnabled: Boolean(u.listsEnabled),
-          }
-        }
+      Object.entries(computedPkg).forEach(([id, pkg]) => {
+        if (!next[id]) next[id] = pkg
       })
       return next
     })
@@ -303,7 +310,7 @@ export const SuperadminPage = () => {
     withAction(async () => {
       const newPassword = newPasswordByUser[userId] || ''
       if (!newPassword || newPassword.length < 8) {
-        setError('New password must be at least 8 characters')
+        setError('Password must be at least 8 characters long')
         return
       }
       await api.post(`/superadmin/users/${userId}/reset-password`, { newPassword })
@@ -316,7 +323,7 @@ export const SuperadminPage = () => {
       const res = await api.post(`/superadmin/users/${userId}/login-as`)
       const payload = safeData(res)
       if (!payload.accessToken || !payload.user) {
-        setError('Impersonation response invalid')
+        setError('Failed to retrieve user session data for impersonation')
         return
       }
       assumeTenantSession({
@@ -353,7 +360,7 @@ export const SuperadminPage = () => {
   const createPlanRecord = async () =>
     withAction(async () => {
       if (!newPlan.name || !newPlan.displayName) {
-        setError('Plan name and display name are required')
+        setError('Both plan name and display name are required')
         return
       }
       await api.post('/superadmin/plans', {
@@ -606,8 +613,8 @@ export const SuperadminPage = () => {
               return (
                 <div className="activity-item" key={plan.id}>
                   <div className="act-dot" style={{ background: plan.isActive ? '#00E676' : '#FF8F00' }} />
-                  <div className="act-text">
-                    {plan.displayName} ({plan.name}) · ₹{(plan.price || 0) / 100}
+                <div className="act-text">
+                    {plan.displayName} ({plan.name}) · {formatPrice(plan.price)}
                     <div className="act-time">
                       AI calls: {plan.maxAiCalls} · Msg gap: {plan.minMsgGapSeconds}s · Buttons:{' '}
                       {String(plan.buttonsEnabled)}
@@ -745,7 +752,6 @@ export const SuperadminPage = () => {
         </div>
         <div className="contacts-table">
           <div className="ct-head superadmin-users-head">
-            <span />
             <span>User</span>
             <span>Email</span>
             <span>Status</span>
@@ -754,7 +760,6 @@ export const SuperadminPage = () => {
           </div>
           {filteredUsers.map((u) => (
             <div className="ct-row superadmin-users-row" key={u.id}>
-              <input type="checkbox" className="ct-checkbox" />
               <div className="ct-name-cell">
                 <div className="ct-av">{u.businessName?.[0] || u.ownerName?.[0] || 'U'}</div>
                 <div>
@@ -994,7 +999,7 @@ export const SuperadminPage = () => {
               <div className="act-dot" style={{ background: '#00E676' }} />
               <div className="act-text">
                 {s.tenant?.businessName || 'User'} · {s.plan?.displayName || 'Plan'}
-                <div className="act-time">{s.status} · ₹{(s.amount || 0) / 100}</div>
+                <div className="act-time">{s.status} · {formatPrice(s.amount)}</div>
               </div>
             </div>
           ))}
@@ -1003,7 +1008,7 @@ export const SuperadminPage = () => {
               <div className="act-dot" style={{ background: '#00BCD4' }} />
               <div className="act-text">
                 {p.tenant?.businessName || 'User'} · {p.plan?.displayName || 'Plan'}
-                <div className="act-time">{p.razorpayPaymentId || 'Manual'} · ₹{(p.amount || 0) / 100}</div>
+                <div className="act-time">{p.razorpayPaymentId || 'Manual'} · {formatPrice(p.amount)}</div>
               </div>
             </div>
           ))}
