@@ -27,7 +27,11 @@ router.use(protect);
 router.get('/',                         listNumbers);
 router.post(
   '/',
-  [body('displayName').optional().isString().trim().isLength({ max: 120 }).withMessage('displayName is too long'), validate],
+  [
+    body('displayName').optional().isString().trim().isLength({ max: 120 }).withMessage('displayName is too long'),
+    body('label').optional().isString().trim().isLength({ max: 120 }).withMessage('label is too long'),
+    validate,
+  ],
   addNumber
 );
 router.get('/:numberId/qr',             [param('numberId').isUUID().withMessage('numberId must be a valid id'), validate], getQRCode);
