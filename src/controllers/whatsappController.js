@@ -52,7 +52,9 @@ function extractHttpStatusFromFailureCode(code) {
   const match = raw.match(/^WA_HTTP_(\d{3})$/);
   if (!match) return null;
   const parsed = Number(match[1]);
-  return Number.isFinite(parsed) ? parsed : null;
+  if (!Number.isFinite(parsed)) return null;
+  if (parsed < 100 || parsed > 599) return null;
+  return parsed;
 }
 
 function serializeQrPayload(number, fallbackStatus = 'initializing') {
@@ -76,7 +78,10 @@ function verifyConnectToken(token) {
 }
 
 function hashTokenJti(jti) {
-  return crypto.createHash('sha256').update(String(jti || '')).digest('hex');
+  if (typeof jti !== 'string' || !jti.trim()) {
+    throw new AppError('Invalid connect token identifier', 401);
+  }
+  return crypto.createHash('sha256').update(jti).digest('hex');
 }
 
 async function markConnectTokenUsed(jti) {
