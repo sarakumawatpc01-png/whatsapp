@@ -14,6 +14,9 @@ const safeList = (res) => {
 
 const parseError = (err, fallback) => err?.response?.data?.error || err?.response?.data?.message || fallback
 const formatPrice = (amountPaise) => `₹${(amountPaise || 0) / 100}`
+const USER_LIST_LIMIT = 50
+const MIN_PASSWORD_LENGTH = 8
+const getAvatarInitial = (user) => user?.businessName?.[0] || user?.ownerName?.[0] || 'U'
 
 const apiKeyDefs = [
   { key: 'anthropic_api_key', label: 'Anthropic API Key' },
@@ -26,6 +29,10 @@ const apiKeyDefs = [
   { key: 'razorpay_key_secret', label: 'Razorpay Key Secret' },
   { key: 'razorpay_webhook_secret', label: 'Razorpay Webhook Secret' },
 ]
+const apiKeyLabelByKey = apiKeyDefs.reduce((acc, item) => {
+  acc[item.key] = item.label
+  return acc
+}, {})
 
 const defaultPlanForm = {
   name: '',
@@ -172,7 +179,7 @@ export const SuperadminPage = () => {
         supportAiRes,
       ] = await Promise.all([
         api.get('/superadmin/stats'),
-        api.get('/superadmin/users?limit=50'),
+        api.get(`/superadmin/users?limit=${USER_LIST_LIMIT}`),
         api.get('/superadmin/plans'),
         api.get('/superadmin/api-keys'),
         api.get('/superadmin/support-tickets?limit=20'),
@@ -261,7 +268,7 @@ export const SuperadminPage = () => {
     withAction(async () => {
       const value = (apiKeyForm[key] || '').trim()
       if (!value) {
-        setError(`Please provide value for ${key}`)
+        setError(`API key value cannot be empty for ${apiKeyLabelByKey[key] || key}`)
         return
       }
       await api.patch('/superadmin/api-keys', { key, value })
@@ -309,8 +316,8 @@ export const SuperadminPage = () => {
   const resetUserPassword = async (userId) =>
     withAction(async () => {
       const newPassword = newPasswordByUser[userId] || ''
-      if (!newPassword || newPassword.length < 8) {
-        setError('Password must be at least 8 characters long')
+      if (!newPassword || newPassword.length < MIN_PASSWORD_LENGTH) {
+        setError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters long`)
         return
       }
       await api.post(`/superadmin/users/${userId}/reset-password`, { newPassword })
@@ -323,7 +330,7 @@ export const SuperadminPage = () => {
       const res = await api.post(`/superadmin/users/${userId}/login-as`)
       const payload = safeData(res)
       if (!payload.accessToken || !payload.user) {
-        setError('Failed to retrieve user session data for impersonation')
+        setError('Failed to retrieve user session data. Please try again.')
         return
       }
       assumeTenantSession({
@@ -361,6 +368,10 @@ export const SuperadminPage = () => {
     withAction(async () => {
       if (!newPlan.name || !newPlan.displayName) {
         setError('Both plan name and display name are required')
+        return
+      }
+      if (Number(newPlan.price) < 0 || Number(newPlan.maxAiCalls) < 1) {
+        setError('Price must be non-negative and max AI calls must be at least 1')
         return
       }
       await api.post('/superadmin/plans', {
@@ -435,7 +446,7 @@ export const SuperadminPage = () => {
     <div className="page active">
       <div className="section-title">Superadmin Control</div>
       <div className="section-sub">
-        Full control panel for settings, options, users, password reset, plan/package management, impersonation, and API providers.
+        Full control panel for managing settings, users, plans/packages, API providers, and impersonation.
       </div>
       {loading && <div className="badge blue">Loading...</div>}
       {error && <div className="badge red">{error}</div>}
@@ -761,7 +772,7 @@ export const SuperadminPage = () => {
           {filteredUsers.map((u) => (
             <div className="ct-row superadmin-users-row" key={u.id}>
               <div className="ct-name-cell">
-                <div className="ct-av">{u.businessName?.[0] || u.ownerName?.[0] || 'U'}</div>
+                <div className="ct-av">{getAvatarInitial(u)}</div>
                 <div>
                   <div className="ct-name">{u.businessName || u.ownerName}</div>
                   <div className="ct-phone">{u.id}</div>
