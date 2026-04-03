@@ -13,8 +13,10 @@ const qrcode = require('qrcode');
 const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
+const { HttpsProxyAgent } = require('https-proxy-agent');
 const prisma = require('../config/database');
 const logger = require('../config/logger');
+const { cacheGet, cacheSet } = require('../config/redis');
 const { getSocketIO } = require('../socket/socketManager');
 const { handleIncomingMessage } = require('./messageHandler');
 const { normalizeToJid } = require('./jid');
@@ -24,6 +26,110 @@ const { getOrCreateContact } = require('./contactStore');
 const activeSessions = new Map();
 const reconnectTimers = new Map();
 const manualDisconnects = new Set();
+// 401/403/405 are treated as blocked-restriction signals for this deployment's WA Web handshake:
+// 401/403 are standard authorization/forbidden responses and 405 was observed for blocked VPS egress.
+const WA_IP_RESTRICTED_STATUS_CODES = new Set([401, 403, 405]);
+const PROXY_CHOICE_TTL_SECONDS = 60 * 60 * 24 * 30;
+
+function isIpRestrictedStatusCode(statusCode) {
+  return Number.isFinite(statusCode) && WA_IP_RESTRICTED_STATUS_CODES.has(statusCode);
+}
+
+function parseDisconnectStatusCode(lastDisconnect) {
+  const code = Number(
+    lastDisconnect?.error?.output?.statusCode
+    || lastDisconnect?.error?.data?.status
+    || lastDisconnect?.error?.status
+  );
+  return Number.isNaN(code) ? null : code;
+}
+
+function parseProxyList() {
+  const raw = process.env.WA_EGRESS_PROXY_URLS || '';
+  const list = raw
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  return [...new Set(list)];
+}
+
+function getProxyState(numberId, currentChoice = null) {
+  const proxies = parseProxyList();
+  const state = { proxies, selectedProxy: null, selectedProxyIndex: -1 };
+  if (!proxies.length) return state;
+
+  const hints = [currentChoice, process.env.WA_EGRESS_PROXY_DEFAULT || '', process.env.WA_EGRESS_PROXY_URL || ''];
+  for (const hint of hints) {
+    const idx = proxies.findIndex((url) => url === hint);
+    if (idx >= 0) {
+      state.selectedProxy = proxies[idx];
+      state.selectedProxyIndex = idx;
+      return state;
+    }
+  }
+
+  state.selectedProxy = proxies[0];
+  state.selectedProxyIndex = 0;
+  return state;
+}
+
+async function persistProxyChoice(numberId, proxyUrl) {
+  if (!proxyUrl) return;
+  await cacheSet(`wa_proxy_choice:${numberId}`, proxyUrl, PROXY_CHOICE_TTL_SECONDS).catch(() => {});
+}
+
+async function rotateProxy(numberId) {
+  const proxies = parseProxyList();
+  if (!proxies.length) return null;
+  const current = await cacheGet(`wa_proxy_choice:${numberId}`);
+  const currentIndex = proxies.findIndex((url) => url === current);
+  const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % proxies.length : 0;
+  const nextProxy = proxies[nextIndex];
+  await persistProxyChoice(numberId, nextProxy);
+  return nextProxy;
+}
+
+function buildFailureMetadata(statusCode, isLoggedOut, isManualDisconnect) {
+  if (isManualDisconnect) {
+    return {
+      code: 'MANUAL_DISCONNECT',
+      reason: 'Session disconnected by user action.',
+      actionableMessage: null,
+      blockedByIp: false,
+      shouldAutoReconnect: false,
+    };
+  }
+
+  if (isLoggedOut) {
+    return {
+      code: 'LOGGED_OUT',
+      reason: 'Session logged out. Reconnect and scan a fresh QR code.',
+      actionableMessage: null,
+      blockedByIp: false,
+      shouldAutoReconnect: false,
+    };
+  }
+
+  if (isIpRestrictedStatusCode(statusCode)) {
+    return {
+      code: `WA_HTTP_${statusCode}`,
+      reason: `WhatsApp Web endpoint rejected this server IP with HTTP ${statusCode}.`,
+      actionableMessage: 'WhatsApp blocked this server IP; switch server/IP.',
+      blockedByIp: true,
+      shouldAutoReconnect: false,
+    };
+  }
+
+  return {
+    code: statusCode ? `WA_DISCONNECT_${statusCode}` : 'WA_DISCONNECT_UNKNOWN',
+    reason: statusCode
+      ? `WhatsApp connection closed (status ${statusCode}).`
+      : 'WhatsApp connection closed unexpectedly.',
+    actionableMessage: null,
+    blockedByIp: false,
+    shouldAutoReconnect: true,
+  };
+}
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -147,12 +253,18 @@ async function createSession(numberId, tenantId, phoneLabel) {
   logger.info(`Creating WA session for number: ${numberId} (tenant: ${tenantId})`);
 
   const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
-  const sock = makeWASocket({
+  const currentProxyChoice = await cacheGet(`wa_proxy_choice:${numberId}`).catch(() => null);
+  const proxyState = getProxyState(numberId, currentProxyChoice);
+  const socketConfig = {
     auth: state,
     logger: pino({ level: process.env.BAILEYS_LOG_LEVEL || 'error' }),
     printQRInTerminal: false,
     markOnlineOnConnect: false,
-  });
+  };
+  if (proxyState.selectedProxy) {
+    socketConfig.fetchAgent = new HttpsProxyAgent(proxyState.selectedProxy);
+  }
+  const sock = makeWASocket(socketConfig);
 
   sock.ev.on('creds.update', saveCreds);
 
@@ -165,7 +277,13 @@ async function createSession(numberId, tenantId, phoneLabel) {
         const qrDataUrl = await qrcode.toDataURL(qr);
         await prisma.tenantNumber.update({
           where: { id: numberId },
-          data: { sessionStatus: 'qr_pending', qrCode: qrDataUrl },
+          data: {
+            sessionStatus: 'qr_pending',
+            qrCode: qrDataUrl,
+            lastFailureCode: null,
+            lastFailureReason: null,
+            lastFailureAt: null,
+          },
         });
         const io = getSocketIO();
         io.to(`tenant:${tenantId}`).emit('wa:qr', { numberId, qr: qrDataUrl });
@@ -177,12 +295,18 @@ async function createSession(numberId, tenantId, phoneLabel) {
     if (connection === 'open') {
       logger.info(`✅ WhatsApp ready for ${numberId}`);
       const user = sock.user?.id ? sock.user.id.split(':')[0] : null;
+      if (proxyState.selectedProxy) {
+        await persistProxyChoice(numberId, proxyState.selectedProxy);
+      }
       await prisma.tenantNumber.update({
         where: { id: numberId },
         data: {
           sessionStatus: 'connected',
           phoneNumber: user ? `+${user}` : undefined,
           qrCode: null,
+          lastFailureCode: null,
+          lastFailureReason: null,
+          lastFailureAt: null,
           lastConnectedAt: new Date(),
         },
       });
@@ -191,24 +315,38 @@ async function createSession(numberId, tenantId, phoneLabel) {
     }
 
     if (connection === 'close') {
-      const statusCode = lastDisconnect?.error?.output?.statusCode;
+      const statusCode = parseDisconnectStatusCode(lastDisconnect);
       const isLoggedOut = statusCode === DisconnectReason.loggedOut;
+      const isManualDisconnect = manualDisconnects.has(numberId);
+      const failure = buildFailureMetadata(statusCode, isLoggedOut, isManualDisconnect);
       logger.warn(`WA disconnected for ${numberId}: ${statusCode || 'unknown'}`);
 
       activeSessions.delete(numberId);
       await prisma.tenantNumber.update({
         where: { id: numberId },
-        data: { sessionStatus: 'disconnected' },
+        data: {
+          sessionStatus: 'disconnected',
+          lastFailureCode: failure.code,
+          lastFailureReason: failure.reason,
+          lastFailureAt: new Date(),
+        },
       }).catch(() => {});
       const io = getSocketIO();
-      io.to(`tenant:${tenantId}`).emit('wa:disconnected', { numberId, reason: statusCode || 'closed' });
+      io.to(`tenant:${tenantId}`).emit('wa:disconnected', {
+        numberId,
+        reason: failure.reason,
+        reasonCode: failure.code,
+        statusCode: statusCode || 'closed',
+        actionableMessage: failure.actionableMessage,
+        blockedByIp: failure.blockedByIp,
+      });
 
-      if (manualDisconnects.has(numberId)) {
+      if (isManualDisconnect) {
         manualDisconnects.delete(numberId);
         return;
       }
 
-      if (!isLoggedOut) {
+      if (failure.shouldAutoReconnect) {
         if (reconnectTimers.has(numberId)) clearTimeout(reconnectTimers.get(numberId));
         const timer = setTimeout(() => {
           reconnectTimers.delete(numberId);
@@ -217,6 +355,20 @@ async function createSession(numberId, tenantId, phoneLabel) {
           });
         }, Number(process.env.WA_RECONNECT_DELAY_MS || 3000));
         reconnectTimers.set(numberId, timer);
+      } else if (failure.blockedByIp && proxyState.proxies.length > 1) {
+        const timer = setTimeout(async () => {
+          reconnectTimers.delete(numberId);
+          const nextProxy = await rotateProxy(numberId).catch(() => null);
+          logger.warn(`WA blocked for ${numberId}; rotating egress proxy to ${nextProxy || 'next'}`);
+          createSession(numberId, tenantId, phoneLabel).catch(err => {
+            logger.error(`Proxy-rotated reconnect failed for ${numberId}:`, err.message);
+          });
+        }, Number(process.env.WA_RECONNECT_DELAY_MS || 3000));
+        reconnectTimers.set(numberId, timer);
+      } else if (failure.blockedByIp && proxyState.proxies.length <= 1) {
+        logger.error(
+          `WA blocked for ${numberId} and no proxy fallback available. Configure WA_EGRESS_PROXY_URLS with multiple clean egress proxies.`
+        );
       }
     }
   });
@@ -684,5 +836,6 @@ module.exports = {
   promoteGroupParticipant: promoteParticipant,
   demoteGroupParticipant: demoteParticipant,
   getSessionStatus,
+  isIpRestrictedStatusCode,
   normalizeToJid,
 };

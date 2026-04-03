@@ -1,13 +1,107 @@
 // src/controllers/whatsappController.js
 const prisma   = require('../config/database');
+const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const { AppError, ValidationError } = require('../utils/errors');
 const { success } = require('../utils/response');
-const { cacheSet, cacheDel } = require('../config/redis');
+const { cacheGet, cacheSet, cacheDel, getRedis } = require('../config/redis');
 const logger   = require('../config/logger');
 const {
   createSession, destroySession, getSessionStatus,
-  getContactInfo, getProfilePicture, setStatus,
+  getContactInfo, getProfilePicture, setStatus, isIpRestrictedStatusCode,
 } = require('../whatsapp/engine');
+
+const DEFAULT_CONNECT_TOKEN_TTL_SECONDS = 300;
+const CONNECT_TOKEN_TTL_SECONDS_RAW = Number(process.env.WA_CONNECT_TOKEN_TTL_SECONDS);
+const CONNECT_TOKEN_TTL_SECONDS = Number.isFinite(CONNECT_TOKEN_TTL_SECONDS_RAW) && CONNECT_TOKEN_TTL_SECONDS_RAW > 0
+  ? Math.floor(CONNECT_TOKEN_TTL_SECONDS_RAW)
+  : DEFAULT_CONNECT_TOKEN_TTL_SECONDS;
+const TOKEN_USED_MARKER_BUFFER_SECONDS = 60;
+const MIN_TOKEN_USED_MARKER_TTL_SECONDS = 120;
+
+if (
+  process.env.WA_CONNECT_TOKEN_TTL_SECONDS
+  && CONNECT_TOKEN_TTL_SECONDS === DEFAULT_CONNECT_TOKEN_TTL_SECONDS
+) {
+  logger.warn('Invalid WA_CONNECT_TOKEN_TTL_SECONDS; falling back to default 300 seconds');
+}
+
+function resolveConnectTokenSecret() {
+  return process.env.WA_CONNECT_TOKEN_SECRET || process.env.JWT_SECRET;
+}
+
+function buildConnectionIssue(number) {
+  if (!number?.lastFailureCode && !number?.lastFailureReason) return null;
+  const statusFromCode = extractHttpStatusFromFailureCode(number.lastFailureCode);
+  const blockedByIp = isIpRestrictedStatusCode(statusFromCode);
+  const actionableMessage = blockedByIp
+    ? 'WhatsApp blocked this server IP; switch server/IP.'
+    : null;
+
+  return {
+    code: number.lastFailureCode || 'WA_UNKNOWN',
+    reason: number.lastFailureReason || 'Connection failed',
+    actionableMessage,
+    blockedByIp,
+    lastFailureAt: number.lastFailureAt || null,
+  };
+}
+
+function extractHttpStatusFromFailureCode(code) {
+  const raw = String(code || '');
+  const match = raw.match(/^WA_HTTP_(\d{3})$/);
+  if (!match) return null;
+  const parsed = Number(match[1]);
+  if (!Number.isFinite(parsed)) return null;
+  if (parsed < 100 || parsed > 599) return null;
+  return parsed;
+}
+
+function serializeQrPayload(number, fallbackStatus = 'initializing') {
+  return {
+    sessionStatus: number.sessionStatus || fallbackStatus,
+    qrCode: number.qrCode || null,
+    issue: buildConnectionIssue(number),
+  };
+}
+
+function issueConnectToken(payload) {
+  const secret = resolveConnectTokenSecret();
+  return jwt.sign(payload, secret, {
+    expiresIn: CONNECT_TOKEN_TTL_SECONDS,
+  });
+}
+
+function verifyConnectToken(token) {
+  const secret = resolveConnectTokenSecret();
+  return jwt.verify(token, secret);
+}
+
+function hashTokenJti(jti) {
+  if (typeof jti !== 'string' || !jti.trim()) {
+    throw new AppError('Invalid connect token identifier', 401);
+  }
+  return crypto.createHash('sha256').update(jti).digest('hex');
+}
+
+async function markConnectTokenUsed(jti) {
+  const ttl = Math.max(
+    CONNECT_TOKEN_TTL_SECONDS + TOKEN_USED_MARKER_BUFFER_SECONDS,
+    MIN_TOKEN_USED_MARKER_TTL_SECONDS
+  );
+  // Keep the "used" marker longer than token lifetime to prevent replay around clock skew and near-expiry races.
+  const redis = getRedis();
+  const key = `wa_connect_token_used:${hashTokenJti(jti)}`;
+  const setResult = await redis.set(key, JSON.stringify(true), { NX: true, EX: ttl });
+  if (setResult !== 'OK') {
+    throw new AppError('Connect token already used', 401);
+  }
+}
+
+async function ensureConnectTokenUnused(jti) {
+  const used = await cacheGet(`wa_connect_token_used:${hashTokenJti(jti)}`);
+  if (used) throw new AppError('Connect token already used', 401);
+}
 
 // ── LIST NUMBERS ──────────────────────────────────────────────
 async function listNumbers(req, res, next) {
@@ -72,23 +166,30 @@ async function getQRCode(req, res, next) {
 
     const number = await prisma.tenantNumber.findFirst({
       where: { id: numberId, tenantId: req.tenantId },
-      select: { id: true, sessionStatus: true, qrCode: true },
+      select: {
+        id: true, tenantId: true, sessionStatus: true, qrCode: true,
+        lastFailureCode: true, lastFailureReason: true, lastFailureAt: true,
+      },
     });
 
     if (!number) return next(new AppError('Number not found', 404));
 
     // If already connected, no QR needed
     if (number.sessionStatus === 'connected') {
-      return success(res, { sessionStatus: 'connected', qrCode: null }, 'Already connected');
+      return success(res, serializeQrPayload({ ...number, qrCode: null }, 'connected'), 'Already connected');
     }
 
     // If no QR yet, trigger a new session
     if (!number.qrCode) {
       createSession(number.id, req.tenantId, null).catch(() => {});
-      return success(res, { sessionStatus: 'initializing', qrCode: null }, 'Generating QR code...');
+      return success(
+        res,
+        serializeQrPayload({ ...number, sessionStatus: number.sessionStatus || 'initializing', qrCode: null }, 'initializing'),
+        'Generating QR code...'
+      );
     }
 
-    return success(res, { sessionStatus: number.sessionStatus, qrCode: number.qrCode });
+    return success(res, serializeQrPayload(number, 'initializing'));
   } catch (err) {
     next(err);
   }
@@ -107,7 +208,13 @@ async function disconnectNumber(req, res, next) {
     await destroySession(numberId);
     await prisma.tenantNumber.update({
       where: { id: numberId },
-      data: { sessionStatus: 'disconnected', qrCode: null },
+      data: {
+        sessionStatus: 'disconnected',
+        qrCode: null,
+        lastFailureCode: 'MANUAL_DISCONNECT',
+        lastFailureReason: 'Session disconnected by user action.',
+        lastFailureAt: new Date(),
+      },
     });
 
     return success(res, {}, 'Number disconnected');
@@ -216,11 +323,134 @@ async function getStatus(req, res, next) {
 
     const number = await prisma.tenantNumber.findFirst({
       where: { id: numberId, tenantId: req.tenantId },
+      select: {
+        id: true,
+        sessionStatus: true,
+        lastFailureCode: true,
+        lastFailureReason: true,
+        lastFailureAt: true,
+      },
     });
     if (!number) return next(new AppError('Number not found', 404));
 
     const liveStatus = getSessionStatus(numberId);
-    return success(res, { sessionStatus: liveStatus });
+    return success(res, {
+      sessionStatus: liveStatus || number.sessionStatus,
+      issue: buildConnectionIssue(number),
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function createConnectToken(req, res, next) {
+  try {
+    const { numberId } = req.params;
+    const number = await prisma.tenantNumber.findFirst({
+      where: { id: numberId, tenantId: req.tenantId },
+      select: { id: true, tenantId: true },
+    });
+    if (!number) return next(new AppError('Number not found', 404));
+
+    const jti = crypto.randomUUID();
+    const token = issueConnectToken({
+      tenantId: number.tenantId,
+      numberId: number.id,
+      jti,
+      scope: 'wa_connect',
+    });
+
+    return success(res, {
+      token,
+      expiresInSeconds: CONNECT_TOKEN_TTL_SECONDS,
+      numberId: number.id,
+    }, 'Connect token generated');
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function resolveNumberFromConnectToken(req, res, next) {
+  try {
+    const token = req.params.connectToken;
+    if (!token || typeof token !== 'string') {
+      return next(new AppError('Connect token is required', 401));
+    }
+
+    const decoded = verifyConnectToken(token);
+    if (decoded.scope !== 'wa_connect') return next(new AppError('Invalid connect token scope', 401));
+    if (!decoded.tenantId || !decoded.numberId || !decoded.jti) return next(new AppError('Invalid connect token payload', 401));
+
+    await ensureConnectTokenUnused(decoded.jti);
+    req.connectToken = {
+      tenantId: decoded.tenantId,
+      numberId: decoded.numberId,
+      jti: decoded.jti,
+    };
+    return next();
+  } catch (err) {
+    if (err.name === 'TokenExpiredError') return next(new AppError('Connect token expired', 401));
+    if (err.name === 'JsonWebTokenError') return next(new AppError('Invalid connect token', 401));
+    return next(err);
+  }
+}
+
+async function getQRCodeByConnectToken(req, res, next) {
+  try {
+    const { tenantId, numberId, jti } = req.connectToken;
+    const number = await prisma.tenantNumber.findFirst({
+      where: { id: numberId, tenantId },
+      select: {
+        id: true, tenantId: true, sessionStatus: true, qrCode: true,
+        lastFailureCode: true, lastFailureReason: true, lastFailureAt: true,
+      },
+    });
+    if (!number) return next(new AppError('Number not found', 404));
+
+    if (number.sessionStatus === 'connected') {
+      await markConnectTokenUsed(jti);
+      return success(res, serializeQrPayload({ ...number, qrCode: null }, 'connected'), 'Already connected');
+    }
+
+    if (!number.qrCode) {
+      createSession(number.id, tenantId, null).catch(err => {
+        logger.error(`createSession error for ${number.id} via connect token:`, err.message);
+      });
+      return success(
+        res,
+        serializeQrPayload({ ...number, sessionStatus: number.sessionStatus || 'initializing', qrCode: null }, 'initializing'),
+        'Generating QR code...'
+      );
+    }
+
+    await markConnectTokenUsed(jti);
+    return success(res, serializeQrPayload(number, 'initializing'));
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function getStatusByConnectToken(req, res, next) {
+  try {
+    const { tenantId, numberId, jti } = req.connectToken;
+    const number = await prisma.tenantNumber.findFirst({
+      where: { id: numberId, tenantId },
+      select: {
+        id: true,
+        sessionStatus: true,
+        lastFailureCode: true,
+        lastFailureReason: true,
+        lastFailureAt: true,
+      },
+    });
+    if (!number) return next(new AppError('Number not found', 404));
+
+    const liveStatus = getSessionStatus(numberId);
+    await markConnectTokenUsed(jti);
+    return success(res, {
+      sessionStatus: liveStatus || number.sessionStatus,
+      issue: buildConnectionIssue(number),
+    });
   } catch (err) {
     next(err);
   }
@@ -229,4 +459,6 @@ async function getStatus(req, res, next) {
 module.exports = {
   listNumbers, addNumber, getQRCode, disconnectNumber, reconnectNumber,
   deleteNumber, updateNumberSettings, getStatus,
+  createConnectToken, resolveNumberFromConnectToken,
+  getQRCodeByConnectToken, getStatusByConnectToken,
 };

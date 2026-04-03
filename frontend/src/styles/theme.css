@@ -464,6 +464,10 @@ select.form-input option{background:var(--surface2)}
 .biz-form-section{background:var(--surface2);border:1px solid var(--border);border-radius:var(--rs);padding:14px;margin-bottom:12px}
 .biz-form-section-title{font-family:var(--fh);font-size:12px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px}
 .form-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.auth-wrap{min-height:100vh;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px}
+.auth-card{width:min(720px,100%);max-width:100%}
+.auth-mode-tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.auth-mode-tabs .tb-btn{flex:1;justify-content:center;min-width:130px}
 
 @media(max-width:1200px){.cal-layout{grid-template-columns:1fr}.ai-layout{grid-template-columns:1fr}}
 @media(max-width:1100px){.grid-4{grid-template-columns:1fr 1fr}.kpi-grid{grid-template-columns:1fr 1fr}.camp-grid{grid-template-columns:1fr 1fr}}

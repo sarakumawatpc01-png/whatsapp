@@ -106,6 +106,9 @@ model TenantNumber {
   sessionFilePath  String?
   sessionStatus    String    @default("disconnected") // disconnected | connecting | connected | banned
   qrCode           String?   @db.Text
+  lastFailureCode  String?
+  lastFailureReason String?  @db.Text
+  lastFailureAt    DateTime?
   lastConnectedAt  DateTime?
   isDefault        Boolean   @default(false)
   minMsgGapSec     Int       @default(5)

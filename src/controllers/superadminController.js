@@ -2,11 +2,13 @@
 const bcrypt   = require('bcryptjs');
 const jwt      = require('jsonwebtoken');
 const crypto   = require('crypto');
+const nodemailer = require('nodemailer');
 const prisma   = require('../config/database');
 const { AppError, ValidationError } = require('../utils/errors');
 const { success, paginated } = require('../utils/response');
 const logger   = require('../config/logger');
 const { cacheSet, cacheGet, cacheDel, cacheDelPattern } = require('../config/redis');
+const MAX_EMAIL_TRANSPORT_CACHE_SIZE = 5;
 
 // ── TOKEN HELPERS ─────────────────────────────────────────────
 function generateAdminTokens(adminId) {
@@ -21,6 +23,84 @@ function generateAdminTokens(adminId) {
     { expiresIn: '7d' }
   );
   return { accessToken, refreshToken };
+}
+
+function maskSecret(value) {
+  const str = String(value || '');
+  if (!str) return '';
+  if (str.length <= 8) return '••••••••';
+  return `${str.slice(0, 4)}••••••${str.slice(-3)}`;
+}
+
+function toBooleanString(value) {
+  if (typeof value === 'boolean') return value ? 'true' : 'false';
+  const normalized = String(value || '').toLowerCase().trim();
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) return 'true';
+  return 'false';
+}
+
+const emailTransportCache = new Map();
+
+async function getEmailRuntimeConfig() {
+  const keyList = ['smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_secure', 'email_from', 'email_from_name'];
+  const settings = await prisma.globalSetting.findMany({ where: { key: { in: keyList } } });
+  const settingMap = settings.reduce((acc, item) => {
+    acc[item.key] = item.value;
+    return acc;
+  }, {});
+  return {
+    smtpHost: settingMap.smtp_host || 'smtp.sendgrid.net',
+    smtpPort: Number(settingMap.smtp_port || 587),
+    smtpSecure: toBooleanString(settingMap.smtp_secure || 'false') === 'true',
+    smtpUser: settingMap.smtp_user || 'apikey',
+    smtpPass: settingMap.smtp_pass || process.env.SENDGRID_API_KEY,
+    fromEmail: settingMap.email_from || process.env.EMAIL_FROM || 'noreply@waizai.com',
+    fromName: settingMap.email_from_name || process.env.EMAIL_FROM_NAME || 'WaizAI',
+  };
+}
+
+function getTransportCacheKey(cfg) {
+  return [
+    cfg.smtpHost,
+    cfg.smtpPort,
+    cfg.smtpSecure ? '1' : '0',
+    cfg.smtpUser,
+    String(cfg.smtpPass || '').slice(0, 8),
+  ].join(':');
+}
+
+async function getReusableTransport() {
+  const cfg = await getEmailRuntimeConfig();
+  if (!cfg.smtpPass) throw new AppError('SMTP password/API key is not configured', 400);
+  const cacheKey = getTransportCacheKey(cfg);
+  if (emailTransportCache.has(cacheKey)) return { transport: emailTransportCache.get(cacheKey), cfg };
+
+  const transport = nodemailer.createTransport({
+    host: cfg.smtpHost,
+    port: cfg.smtpPort,
+    secure: cfg.smtpSecure,
+    auth: { user: cfg.smtpUser, pass: cfg.smtpPass },
+    pool: true,
+  });
+  emailTransportCache.set(cacheKey, transport);
+  if (emailTransportCache.size > MAX_EMAIL_TRANSPORT_CACHE_SIZE) {
+    const [firstKey] = emailTransportCache.keys();
+    emailTransportCache.delete(firstKey);
+  }
+
+  return { transport, cfg };
+}
+
+function sanitizeCustomEmailHtml(input) {
+  const source = String(input || '').slice(0, 50000);
+  if (!source.trim()) return '';
+  const escaped = source
+    .split('&').join('&amp;')
+    .split('<').join('&lt;')
+    .split('>').join('&gt;')
+    .split('"').join('&quot;')
+    .split("'").join('&#39;');
+  return `<div style="white-space:pre-wrap">${escaped}</div>`;
 }
 
 // ── LOGIN ─────────────────────────────────────────────────────
@@ -703,10 +783,13 @@ async function getApiKeys(req, res, next) {
           in: [
             'anthropic_api_key', 'openai_api_key',
             'deepseek_api_key', 'sarvam_api_key',
+            'openrouter_api_key',
             'sendgrid_api_key', 'twilio_account_sid',
             'twilio_auth_token', 'twilio_phone',
             'razorpay_key_id', 'razorpay_key_secret', 'razorpay_webhook_secret',
             'google_client_id', 'google_client_secret',
+            'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_secure',
+            'email_from', 'email_from_name',
           ],
         },
       },
@@ -735,9 +818,12 @@ async function updateApiKey(req, res, next) {
 
     const allowedKeys = [
       'anthropic_api_key', 'openai_api_key', 'deepseek_api_key', 'sarvam_api_key',
+      'openrouter_api_key',
       'sendgrid_api_key', 'twilio_account_sid', 'twilio_auth_token', 'twilio_phone',
       'razorpay_key_id', 'razorpay_key_secret', 'razorpay_webhook_secret',
       'google_client_id', 'google_client_secret',
+      'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_secure',
+      'email_from', 'email_from_name',
     ];
     if (!allowedKeys.includes(key)) return next(new AppError(`Unknown key: ${key}`, 400));
 
@@ -1344,6 +1430,217 @@ async function resolveSupportTicket(req, res, next) {
   }
 }
 
+// ── ADMIN ACTION LOGS ───────────────────────────────────────────
+async function listAdminActions(req, res, next) {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 25;
+    const skip = (page - 1) * limit;
+
+    const [actions, total] = await Promise.all([
+      prisma.adminAction.findMany({
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          admin: { select: { id: true, email: true, name: true } },
+        },
+      }),
+      prisma.adminAction.count(),
+    ]);
+
+    return paginated(res, actions, total, page, limit);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ── USER LOGIN SESSIONS ─────────────────────────────────────────
+async function listUserSessions(req, res, next) {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 25;
+    const skip = (page - 1) * limit;
+
+    const [sessions, total] = await Promise.all([
+      prisma.userSession.findMany({
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          tenant: { select: { id: true, businessName: true, email: true, status: true } },
+        },
+      }),
+      prisma.userSession.count(),
+    ]);
+
+    return paginated(res, sessions, total, page, limit);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ── TOKEN/API USAGE ─────────────────────────────────────────────
+async function listTokenUsage(req, res, next) {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 25;
+    const skip = (page - 1) * limit;
+
+    const [usage, total, summary] = await Promise.all([
+      prisma.apiUsage.findMany({
+        skip,
+        take: limit,
+        orderBy: { timestamp: 'desc' },
+        include: {
+          tenant: { select: { id: true, businessName: true, email: true } },
+        },
+      }),
+      prisma.apiUsage.count(),
+      prisma.apiUsage.groupBy({
+        by: ['provider'],
+        _sum: { inputTokens: true, outputTokens: true, costUsd: true },
+        _count: { id: true },
+        orderBy: { _sum: { costUsd: 'desc' } },
+      }),
+    ]);
+
+    return paginated(res, { data: usage, summaryByProvider: summary }, total, page, limit);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ── EMAIL SETTINGS ──────────────────────────────────────────────
+async function getEmailSettings(req, res, next) {
+  try {
+    const keys = [
+      'smtp_host',
+      'smtp_port',
+      'smtp_user',
+      'smtp_pass',
+      'smtp_secure',
+      'email_from',
+      'email_from_name',
+      'sendgrid_api_key',
+    ];
+    const settings = await prisma.globalSetting.findMany({ where: { key: { in: keys } } });
+    const map = settings.reduce((acc, item) => {
+      acc[item.key] = item.value;
+      return acc;
+    }, {});
+
+    return success(res, {
+      settings: {
+        smtp_host: map.smtp_host || '',
+        smtp_port: map.smtp_port || '587',
+        smtp_user: map.smtp_user ? maskSecret(map.smtp_user) : '',
+        smtp_pass: map.smtp_pass ? 'Configured' : '',
+        smtp_secure: toBooleanString(map.smtp_secure || 'false'),
+        email_from: map.email_from || process.env.EMAIL_FROM || '',
+        email_from_name: map.email_from_name || process.env.EMAIL_FROM_NAME || '',
+        sendgrid_api_key: map.sendgrid_api_key ? 'Configured' : '',
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function updateEmailSettings(req, res, next) {
+  try {
+    const allowed = ['smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_secure', 'email_from', 'email_from_name'];
+    const updates = Object.entries(req.body || {}).filter(([k]) => allowed.includes(k));
+    if (!updates.length) return next(new ValidationError('No valid email settings provided'));
+
+    await Promise.all(updates.map(([key, value]) => prisma.globalSetting.upsert({
+      where: { key },
+      create: { key, value: String(value ?? '') },
+      update: { value: String(value ?? '') },
+    })));
+
+    await Promise.all(updates.map(([key]) => cacheDel(`setting:${key}`)));
+    await prisma.adminAction.create({
+      data: {
+        adminId: req.adminId,
+        actionType: 'update_email_settings',
+        metadata: { keys: updates.map(([k]) => k) },
+        ipAddress: req.ip,
+      },
+    });
+
+    return success(res, {}, 'Email settings updated');
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ── TEST / CUSTOM EMAIL ─────────────────────────────────────────
+async function testEmailSettings(req, res, next) {
+  try {
+    const { to } = req.body || {};
+    if (!to) return next(new ValidationError('to is required'));
+    const { transport, cfg } = await getReusableTransport();
+
+    await transport.sendMail({
+      from: `"${cfg.fromName}" <${cfg.fromEmail}>`,
+      to,
+      subject: 'WaizAI Superadmin test email',
+      text: 'This is a test email from WaizAI superadmin panel.',
+      html: '<p>This is a test email from <strong>WaizAI superadmin panel</strong>.</p>',
+    });
+
+    await prisma.adminAction.create({
+      data: {
+        adminId: req.adminId,
+        actionType: 'test_email_settings',
+        metadata: { to },
+        ipAddress: req.ip,
+      },
+    });
+
+    return success(res, {}, 'Test email sent successfully');
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function sendCustomEmail(req, res, next) {
+  try {
+    const { to, subject, html, text } = req.body || {};
+    if (!to || !subject || (!html && !text)) {
+      return next(new ValidationError('to, subject and one of html/text are required'));
+    }
+    const { transport, cfg } = await getReusableTransport();
+    const sanitizedHtml = html ? sanitizeCustomEmailHtml(html) : undefined;
+    const normalizedText = text ? String(text).slice(0, 20000) : undefined;
+    if (!sanitizedHtml && !normalizedText) {
+      return next(new ValidationError('Email body is empty after sanitization'));
+    }
+
+    await transport.sendMail({
+      from: `"${cfg.fromName}" <${cfg.fromEmail}>`,
+      to,
+      subject,
+      html: sanitizedHtml,
+      text: normalizedText,
+    });
+
+    await prisma.adminAction.create({
+      data: {
+        adminId: req.adminId,
+        actionType: 'send_custom_email',
+        metadata: { to, subjectLength: String(subject).length },
+        ipAddress: req.ip,
+      },
+    });
+
+    return success(res, {}, 'Custom email sent');
+  } catch (err) {
+    next(err);
+  }
+}
+
 // ── HELPERS ────────────────────────────────────────────────────
 function getDefaultThemes() {
   return [
@@ -1374,4 +1671,6 @@ module.exports = {
   getActivityMonitor,
   getSupportAiConfig, updateSupportAiConfig,
   listSupportTickets, resolveSupportTicket,
+  listAdminActions, listUserSessions, listTokenUsage,
+  getEmailSettings, updateEmailSettings, testEmailSettings, sendCustomEmail,
 };

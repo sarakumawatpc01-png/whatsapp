@@ -6,14 +6,16 @@ export const WhatsAppPage = () => {
   const { api } = useAuth()
   const [numbers, setNumbers] = useState([])
   const [qr, setQr] = useState('')
+  const [qrStatus, setQrStatus] = useState('')
+  const [qrIssue, setQrIssue] = useState(null)
   const [error, setError] = useState('')
   const [newNumber, setNewNumber] = useState({ phoneNumber: '', label: '' })
 
   const load = useCallback(async () => {
     try {
       const res = await api.get('/whatsapp')
-      const data = res.data?.data || res.data
-      setNumbers(data || [])
+      const data = res.data?.data?.numbers || res.data?.data || []
+      setNumbers(Array.isArray(data) ? data : [])
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load numbers')
     }
@@ -37,7 +39,10 @@ export const WhatsAppPage = () => {
   const showQr = async (id) => {
     try {
       const res = await api.get(`/whatsapp/${id}/qr`)
-      setQr(res.data?.data?.qr || res.data?.qr || '')
+      const payload = res.data?.data || {}
+      setQr(payload?.qrCode || payload?.qr || '')
+      setQrStatus(payload?.sessionStatus || '')
+      setQrIssue(payload?.issue || null)
     } catch (err) {
       setError(err.response?.data?.error || 'QR fetch failed')
     }
@@ -81,6 +86,13 @@ export const WhatsAppPage = () => {
 
         <Card title="QR / Status">
           {qr ? <img src={qr} alt="QR" style={{ maxWidth: '100%' }} /> : <div className="act-time">Select a number</div>}
+          {qrStatus && <div className="cc-desc" style={{ marginTop: 8 }}>Status: {qrStatus}</div>}
+          {qrIssue?.reason && (
+            <div className="badge red" style={{ marginTop: 8 }}>
+              {qrIssue.reason}
+              {qrIssue.actionableMessage ? ` ${qrIssue.actionableMessage}` : ''}
+            </div>
+          )}
         </Card>
       </div>
 

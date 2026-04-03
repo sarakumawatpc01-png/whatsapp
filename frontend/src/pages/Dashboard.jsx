@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Card } from '../components/common/Card'
 import { useAuth } from '../context/AuthContext'
 
@@ -65,6 +66,11 @@ export const DashboardPage = () => {
         <div className="ow-text">
           <h2>Welcome back</h2>
           <p>All your WhatsApp automation, AI, campaigns, billing and analytics in one place.</p>
+          <div style={{ marginTop: 10 }}>
+            <Link className="btn btn-primary" to="/walkthrough" style={{ textDecoration: 'none' }}>
+              Start Interactive Walkthrough
+            </Link>
+          </div>
         </div>
         <div className="ai-master-toggle">
           <div className="amt-label">System status</div>

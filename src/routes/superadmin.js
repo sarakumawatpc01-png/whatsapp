@@ -30,10 +30,13 @@ const {
   listThemes, createTheme, setDefaultTheme, assignTheme,
   // Activity Monitor
   getActivityMonitor,
+  listAdminActions, listUserSessions, listTokenUsage,
   // Support AI
   getSupportAiConfig, updateSupportAiConfig,
   // Support Tickets
   listSupportTickets, resolveSupportTicket,
+  // Email setup
+  getEmailSettings, updateEmailSettings, testEmailSettings, sendCustomEmail,
   // Custom Package
   assignCustomPackage,
 } = require('../controllers/superadminController');
@@ -57,6 +60,9 @@ router.use(protectSuperAdmin, adminApiLimiter);
 // ── DASHBOARD ────────────────────────────────────────────────
 router.get('/stats',                        getPlatformStats);
 router.get('/activity-monitor',             getActivityMonitor);
+router.get('/activity-logs',                listAdminActions);
+router.get('/user-sessions',                listUserSessions);
+router.get('/token-usage',                  listTokenUsage);
 
 // ── USER MANAGEMENT ──────────────────────────────────────────
 router.get('/users',                        listUsers);
@@ -120,5 +126,11 @@ router.patch('/support-ai',                 updateSupportAiConfig);
 // ── SUPPORT TICKETS ───────────────────────────────────────────
 router.get('/support-tickets',              listSupportTickets);
 router.post('/support-tickets/:ticketId/resolve', resolveSupportTicket);
+
+// ── EMAIL SETUP/ACCESS ─────────────────────────────────────────
+router.get('/email-settings',               getEmailSettings);
+router.patch('/email-settings',             updateEmailSettings);
+router.post('/email-settings/test',         testEmailSettings);
+router.post('/email/send-custom',           sendCustomEmail);
 
 module.exports = router;

@@ -91,23 +91,14 @@ export const AuthPage = () => {
   }
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: 'var(--bg)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '24px',
-      }}
-    >
-      <div className="card" style={{ width: 460, maxWidth: '100%' }}>
+    <div className="auth-wrap">
+      <div className="card auth-card">
         <div className="card-head">
           <div className="card-title">Welcome to WaizAI</div>
           <div className="badge green">Secure login</div>
         </div>
 
-        <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+        <div className="auth-mode-tabs">
           <button
             className={`tb-btn ghost ${mode === 'login' ? 'primary' : ''}`}
             onClick={() => setMode('login')}
@@ -276,7 +267,7 @@ export const AuthPage = () => {
         {feedback && (
           <div
             className="badge orange"
-            style={{ marginTop: 12, justifyContent: 'center', width: '100%' }}
+            style={{ marginTop: 12, justifyContent: 'center', width: '100%', textAlign: 'center' }}
           >
             {feedback}
           </div>
