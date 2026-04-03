@@ -112,6 +112,7 @@ export const SuperadminPage = () => {
     support_ai_model: '',
     support_ai_prompt: '',
   })
+  const [activeSettingsTab, setActiveSettingsTab] = useState('api')
 
   const [newPlan, setNewPlan] = useState(defaultPlanForm)
   const [editingPlanId, setEditingPlanId] = useState(null)
@@ -510,112 +511,197 @@ export const SuperadminPage = () => {
         </Card>
       </div>
 
-      <Card title="API Keys & Providers (OpenAI / Anthropic / DeepSeek / Sarvam / OpenRouter)">
-        <div className="form-grid-2">
-          {apiKeyDefs.map(({ key, label }) => (
-            <div className="form-group" key={key}>
-              <label className="form-label">{label}</label>
-              <div className="act-time">Current: {apiKeys[key] || '—'}</div>
-              <input
-                className="form-input"
-                value={apiKeyForm[key]}
-                onChange={(e) => setApiKeyForm((prev) => ({ ...prev, [key]: e.target.value }))}
-                type="password"
-                placeholder={`Set ${key}`}
-              />
-              <button className="btn btn-primary" onClick={() => saveApiKey(key)}>
-                Save
-              </button>
-            </div>
-          ))}
+      <Card title="Settings Center">
+        <div className="status-actions" style={{ marginBottom: 12 }}>
+          <button className={`ct-act ${activeSettingsTab === 'api' ? 'active' : ''}`} onClick={() => setActiveSettingsTab('api')}>
+            API Keys
+          </button>
+          <button className={`ct-act ${activeSettingsTab === 'otp' ? 'active' : ''}`} onClick={() => setActiveSettingsTab('otp')}>
+            OTP
+          </button>
+          <button className={`ct-act ${activeSettingsTab === 'support' ? 'active' : ''}`} onClick={() => setActiveSettingsTab('support')}>
+            Support AI
+          </button>
+          <button className={`ct-act ${activeSettingsTab === 'email' ? 'active' : ''}`} onClick={() => setActiveSettingsTab('email')}>
+            Email
+          </button>
         </div>
+
+        {activeSettingsTab === 'api' ? (
+          <div>
+            <div className="section-sub" style={{ marginBottom: 12 }}>
+              API key setup guide: Save provider keys here, then check “AI Token Usage Summary” and “Recent API / Token Usage Logs” to monitor consumption.
+            </div>
+            <div className="form-grid-2">
+              {apiKeyDefs.map(({ key, label }) => (
+                <div className="form-group" key={key}>
+                  <label className="form-label">{label}</label>
+                  <div className="act-time">Current: {apiKeys[key] || '—'}</div>
+                  <input
+                    className="form-input"
+                    value={apiKeyForm[key]}
+                    onChange={(e) => setApiKeyForm((prev) => ({ ...prev, [key]: e.target.value }))}
+                    type="password"
+                    placeholder={`Set ${key}`}
+                  />
+                  <button className="btn btn-primary" onClick={() => saveApiKey(key)}>
+                    Save
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {activeSettingsTab === 'otp' ? (
+          <div>
+            <div className="form-grid-2">
+              <div className="form-group">
+                <label className="form-label">Provider</label>
+                <input
+                  className="form-input"
+                  value={otpSettings.otp_provider}
+                  onChange={(e) => setOtpSettings((p) => ({ ...p, otp_provider: e.target.value }))}
+                  placeholder="twilio | msg91 | custom"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Expiry Minutes</label>
+                <input
+                  className="form-input"
+                  value={otpSettings.otp_expiry_minutes}
+                  onChange={(e) => setOtpSettings((p) => ({ ...p, otp_expiry_minutes: e.target.value }))}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Resend Limit</label>
+                <input
+                  className="form-input"
+                  value={otpSettings.otp_resend_limit}
+                  onChange={(e) => setOtpSettings((p) => ({ ...p, otp_resend_limit: e.target.value }))}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Whitelist Phones</label>
+                <input
+                  className="form-input"
+                  value={otpSettings.otp_whitelist_phones}
+                  onChange={(e) => setOtpSettings((p) => ({ ...p, otp_whitelist_phones: e.target.value }))}
+                  placeholder="+911234567890,+919876543210"
+                />
+              </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">SMS Template</label>
+              <textarea
+                className="form-input"
+                value={otpSettings.otp_sms_template}
+                onChange={(e) => setOtpSettings((p) => ({ ...p, otp_sms_template: e.target.value }))}
+              />
+            </div>
+            <button className="btn btn-primary" onClick={saveOtpSettings}>
+              Save OTP Settings
+            </button>
+          </div>
+        ) : null}
+
+        {activeSettingsTab === 'support' ? (
+          <div>
+            <div className="form-group">
+              <label className="form-label">Enabled</label>
+              <select
+                className="form-input"
+                value={supportAiConfig.support_ai_enabled}
+                onChange={(e) => setSupportAiConfig((p) => ({ ...p, support_ai_enabled: e.target.value }))}
+              >
+                <option value="false">Disabled</option>
+                <option value="true">Enabled</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Model</label>
+              <input
+                className="form-input"
+                value={supportAiConfig.support_ai_model}
+                onChange={(e) => setSupportAiConfig((p) => ({ ...p, support_ai_model: e.target.value }))}
+                placeholder="gpt-4o-mini / deepseek-chat / sarvam-2b"
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Prompt</label>
+              <textarea
+                className="form-input"
+                value={supportAiConfig.support_ai_prompt}
+                onChange={(e) => setSupportAiConfig((p) => ({ ...p, support_ai_prompt: e.target.value }))}
+              />
+            </div>
+            <button className="btn btn-primary" onClick={saveSupportAiConfig}>
+              Save Support AI
+            </button>
+          </div>
+        ) : null}
+
+        {activeSettingsTab === 'email' ? (
+          <div className="overview-mid">
+            <Card title="Email Setup & Access">
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label className="form-label">SMTP Host</label>
+                  <input
+                    className="form-input"
+                    value={emailSettings.smtp_host}
+                    onChange={(e) => setEmailSettings((p) => ({ ...p, smtp_host: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">SMTP Port</label>
+                  <input
+                    className="form-input"
+                    value={emailSettings.smtp_port}
+                    onChange={(e) => setEmailSettings((p) => ({ ...p, smtp_port: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">SMTP User</label>
+                  <input
+                    className="form-input"
+                    value={emailSettings.smtp_user}
+                    onChange={(e) => setEmailSettings((p) => ({ ...p, smtp_user: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">SMTP Password</label>
+                  <input
+                    className="form-input"
+                    value={emailSettings.smtp_pass}
+                    type="password"
+                    onChange={(e) => setEmailSettings((p) => ({ ...p, smtp_pass: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Email From</label>
+                  <input
+                    className="form-input"
+                    value={emailSettings.email_from}
+                    onChange={(e) => setEmailSettings((p) => ({ ...p, email_from: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Email From Name</label>
+                  <input
+                    className="form-input"
+                    value={emailSettings.email_from_name}
+                    onChange={(e) => setEmailSettings((p) => ({ ...p, email_from_name: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <button className="btn btn-primary" onClick={saveEmailSettings}>
+                Save Email Settings
+              </button>
+            </Card>
+          </div>
+        ) : null}
       </Card>
-
-      <div className="overview-mid">
-        <Card title="OTP Settings">
-          <div className="form-grid-2">
-            <div className="form-group">
-              <label className="form-label">Provider</label>
-              <input
-                className="form-input"
-                value={otpSettings.otp_provider}
-                onChange={(e) => setOtpSettings((p) => ({ ...p, otp_provider: e.target.value }))}
-                placeholder="twilio | msg91 | custom"
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Expiry Minutes</label>
-              <input
-                className="form-input"
-                value={otpSettings.otp_expiry_minutes}
-                onChange={(e) => setOtpSettings((p) => ({ ...p, otp_expiry_minutes: e.target.value }))}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Resend Limit</label>
-              <input
-                className="form-input"
-                value={otpSettings.otp_resend_limit}
-                onChange={(e) => setOtpSettings((p) => ({ ...p, otp_resend_limit: e.target.value }))}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Whitelist Phones</label>
-              <input
-                className="form-input"
-                value={otpSettings.otp_whitelist_phones}
-                onChange={(e) => setOtpSettings((p) => ({ ...p, otp_whitelist_phones: e.target.value }))}
-                placeholder="+911234567890,+919876543210"
-              />
-            </div>
-          </div>
-          <div className="form-group">
-            <label className="form-label">SMS Template</label>
-            <textarea
-              className="form-input"
-              value={otpSettings.otp_sms_template}
-              onChange={(e) => setOtpSettings((p) => ({ ...p, otp_sms_template: e.target.value }))}
-            />
-          </div>
-          <button className="btn btn-primary" onClick={saveOtpSettings}>
-            Save OTP Settings
-          </button>
-        </Card>
-
-        <Card title="Support AI Settings">
-          <div className="form-group">
-            <label className="form-label">Enabled</label>
-            <select
-              className="form-input"
-              value={supportAiConfig.support_ai_enabled}
-              onChange={(e) => setSupportAiConfig((p) => ({ ...p, support_ai_enabled: e.target.value }))}
-            >
-              <option value="false">Disabled</option>
-              <option value="true">Enabled</option>
-            </select>
-          </div>
-          <div className="form-group">
-            <label className="form-label">Model</label>
-            <input
-              className="form-input"
-              value={supportAiConfig.support_ai_model}
-              onChange={(e) => setSupportAiConfig((p) => ({ ...p, support_ai_model: e.target.value }))}
-              placeholder="gpt-4o-mini / deepseek-chat / sarvam-2b"
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Prompt</label>
-            <textarea
-              className="form-input"
-              value={supportAiConfig.support_ai_prompt}
-              onChange={(e) => setSupportAiConfig((p) => ({ ...p, support_ai_prompt: e.target.value }))}
-            />
-          </div>
-          <button className="btn btn-primary" onClick={saveSupportAiConfig}>
-            Save Support AI
-          </button>
-        </Card>
-      </div>
 
       <Card title="Plans & Packages">
         <div className="overview-mid">
@@ -865,63 +951,6 @@ export const SuperadminPage = () => {
       </Card>
 
       <div className="overview-mid">
-        <Card title="Email Setup & Access">
-          <div className="form-grid-2">
-            <div className="form-group">
-              <label className="form-label">SMTP Host</label>
-              <input
-                className="form-input"
-                value={emailSettings.smtp_host}
-                onChange={(e) => setEmailSettings((p) => ({ ...p, smtp_host: e.target.value }))}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">SMTP Port</label>
-              <input
-                className="form-input"
-                value={emailSettings.smtp_port}
-                onChange={(e) => setEmailSettings((p) => ({ ...p, smtp_port: e.target.value }))}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">SMTP User</label>
-              <input
-                className="form-input"
-                value={emailSettings.smtp_user}
-                onChange={(e) => setEmailSettings((p) => ({ ...p, smtp_user: e.target.value }))}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">SMTP Password</label>
-              <input
-                className="form-input"
-                value={emailSettings.smtp_pass}
-                type="password"
-                onChange={(e) => setEmailSettings((p) => ({ ...p, smtp_pass: e.target.value }))}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Email From</label>
-              <input
-                className="form-input"
-                value={emailSettings.email_from}
-                onChange={(e) => setEmailSettings((p) => ({ ...p, email_from: e.target.value }))}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Email From Name</label>
-              <input
-                className="form-input"
-                value={emailSettings.email_from_name}
-                onChange={(e) => setEmailSettings((p) => ({ ...p, email_from_name: e.target.value }))}
-              />
-            </div>
-          </div>
-          <button className="btn btn-primary" onClick={saveEmailSettings}>
-            Save Email Settings
-          </button>
-        </Card>
-
         <Card title="Custom Email Sending">
           <div className="form-group">
             <label className="form-label">Test Email Address</label>

@@ -45,12 +45,19 @@ function parseDisconnectStatusCode(lastDisconnect) {
 }
 
 function parseProxyList() {
-  const raw = process.env.WA_EGRESS_PROXY_URLS || '';
-  const list = raw
+  const rawList = process.env.WA_EGRESS_PROXY_URLS || '';
+  const list = rawList
     .split(',')
     .map((entry) => entry.trim())
     .filter(Boolean);
-  return [...new Set(list)];
+  const fallbackProxies = [
+    process.env.WA_EGRESS_PROXY_DEFAULT || '',
+    process.env.WA_EGRESS_PROXY_URL || '',
+  ]
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  return [...new Set([...list, ...fallbackProxies])];
 }
 
 function getProxyState(numberId, currentChoice = null) {
@@ -255,11 +262,18 @@ async function createSession(numberId, tenantId, phoneLabel) {
   const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
   const currentProxyChoice = await cacheGet(`wa_proxy_choice:${numberId}`).catch(() => null);
   const proxyState = getProxyState(numberId, currentProxyChoice);
+  const browserVersion = String(process.env.WA_BROWSER_VERSION || '122.0.0.0').trim();
   const socketConfig = {
     auth: state,
     logger: pino({ level: process.env.BAILEYS_LOG_LEVEL || 'error' }),
     printQRInTerminal: false,
     markOnlineOnConnect: false,
+    connectTimeoutMs: Number(process.env.WA_CONNECT_TIMEOUT_MS || 60_000),
+    defaultQueryTimeoutMs: Number(process.env.WA_QUERY_TIMEOUT_MS || 60_000),
+    keepAliveIntervalMs: Number(process.env.WA_KEEPALIVE_MS || 20_000),
+    emitOwnEvents: false,
+    syncFullHistory: false,
+    browser: ['Ubuntu', 'Chrome', browserVersion],
   };
   if (proxyState.selectedProxy) {
     socketConfig.fetchAgent = new HttpsProxyAgent(proxyState.selectedProxy);
