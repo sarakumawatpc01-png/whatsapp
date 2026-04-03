@@ -67,6 +67,17 @@ At minimum set strong values for:
 - `POSTGRES_PASSWORD`
 - `DATABASE_URL` (or rely on compose-provided override)
 - `CORS_ALLOWED_ORIGINS` (production frontend domain only)
+- `WA_CONNECT_TOKEN_SECRET` (dedicated short-lived token secret)
+
+### WhatsApp QR/login reliability (required in blocked VPS environments)
+
+- Persist auth state on disk across container restarts:
+  - backend uses `WA_SESSION_DIR=/app/whatsapp-auth-state`
+  - compose now mounts named volume `whatsapp_auth_state` to `/app/whatsapp-auth-state`
+- If WhatsApp blocks your datacenter IP (commonly HTTP 401/403/405), configure residential/mobile egress proxies:
+  - `WA_EGRESS_PROXY_URLS=https://user:pass@proxy1:port,https://user:pass@proxy2:port`
+  - `WA_EGRESS_PROXY_DEFAULT=https://user:pass@proxy1:port`
+- After proxy/env updates, restart backend and reconnect numbers so fresh QR/session initialization occurs.
 
 Frontend `.env` must use production domains:
 - `VITE_API_URL=https://whatsapp.agencyfic.com/api`
