@@ -13,9 +13,11 @@ ENV VITE_SUPERADMIN_SLUG=${VITE_SUPERADMIN_SLUG}
 COPY . .
 RUN npm run build
 
-FROM nginx:1.27-alpine
-COPY --from=build /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-EXPOSE 80
+FROM node:20-alpine
+WORKDIR /app
+COPY --from=build /app/dist /app/dist
+RUN npm i -g serve
+EXPOSE 4173
 HEALTHCHECK --interval=30s --timeout=5s --retries=5 --start-period=10s \
-  CMD wget -qO- http://127.0.0.1/health >/dev/null || exit 1
+  CMD wget -qO- http://127.0.0.1:4173/ >/dev/null || exit 1
+CMD ["serve", "-s", "/app/dist", "-l", "4173"]

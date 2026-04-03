@@ -1,42 +1,38 @@
-# Production Readiness Guide (Single VPS + Docker + Nginx Proxy Manager)
+# Production Readiness Guide (Single VPS + Docker + Traefik)
 
-This repo is prepared for deployment on a single VPS with Docker Compose where **Nginx Proxy Manager (NPM)** is the only public entrypoint.
+This repo is prepared for deployment on a single VPS with Docker Compose where **Traefik** is the only public entrypoint with automatic Let's Encrypt SSL.
 
 ## 1) Architecture and routing
 
-Recommended public hostnames:
-- `waizai.<yourdomain>` → frontend container (`frontend:80`)
-- `api-waizai.<yourdomain>` (optional) → backend container (`backend:5000`)
+Recommended public hostname:
+- `whatsapp.agencyfic.com` → frontend and backend routes via Traefik
 
 ### Preferred setup
-- Keep backend internal-only if possible.
-- If frontend needs direct browser API calls, expose backend via a dedicated API subdomain in NPM.
+- Use one domain for app + API: frontend on `/`, backend on `/api`, `/socket.io`, and `/health`.
+- Keep Postgres and Redis internal-only.
 
-## 2) NPM mapping
+## 2) Traefik mapping
 
-Create Proxy Hosts in NPM:
+Traefik labels are configured in `docker-compose.prod.yml`:
 
-1. **Frontend host**
-   - Domain Names: `waizai.<yourdomain>`
-   - Scheme: `http`
-   - Forward Hostname / IP: `frontend`
-   - Forward Port: `80`
-   - Enable `Websockets Support` (safe to keep on)
-   - SSL tab: Request new SSL certificate, force SSL, HTTP/2 on
+1. **Frontend router**
+   - Host: `whatsapp.agencyfic.com`
+   - EntryPoint: `websecure`
+   - TLS certresolver: `letsencrypt`
+   - Service port: `4173`
 
-2. **Backend host (only if needed)**
-   - Domain Names: `api-waizai.<yourdomain>`
-   - Scheme: `http`
-   - Forward Hostname / IP: `backend`
-   - Forward Port: `5000`
-   - Enable `Websockets Support` (required for Socket.IO)
-   - SSL tab: Request new SSL certificate, force SSL, HTTP/2 on
+2. **Backend router**
+   - Host: `whatsapp.agencyfic.com`
+   - Paths: `/api`, `/socket.io`, `/health`
+   - EntryPoint: `websecure`
+   - TLS certresolver: `letsencrypt`
+   - Service port: `5000`
 
 ## 3) Internal-only endpoints
 
 - `/api/webhooks/*` should be called only by trusted providers.
 - Admin and auth endpoints are rate limited and must always require proper auth.
-- Do not expose Postgres/Redis ports publicly.
+- Do not expose Postgres/Redis ports publicly and do not bind app ports to host.
 
 ## 4) Security hardening implemented
 
@@ -53,7 +49,7 @@ Create Proxy Hosts in NPM:
 ## 5) Docker setup summary
 
 - `docker-compose.prod.yml` services:
-  - `frontend` (nginx static)
+  - `frontend` (static app via `serve`)
   - `backend` (Node/Express + Prisma)
   - `postgres` (named volume)
   - `redis` (AOF + named volume)
@@ -61,7 +57,7 @@ Create Proxy Hosts in NPM:
 - Healthchecks: backend, postgres, redis, frontend
 - Networks:
   - `internal` for DB/Redis/backend private communication
-  - `proxy` for NPM-facing services
+  - `proxy` as external Traefik network
 
 ## 6) Required environment configuration
 
@@ -73,12 +69,12 @@ At minimum set strong values for:
 - `CORS_ALLOWED_ORIGINS` (production frontend domain only)
 
 Frontend `.env` must use production domains:
-- `VITE_API_URL=https://api-waizai.<yourdomain>/api` (if backend exposed)
-- `VITE_SOCKET_URL=https://api-waizai.<yourdomain>`
+- `VITE_API_URL=https://whatsapp.agencyfic.com/api`
+- `VITE_SOCKET_URL=https://whatsapp.agencyfic.com`
 
 ## 7) Websocket requirement
 
-Socket.IO is used, so if backend is proxied publicly through NPM, enable **Websockets Support** on that backend proxy host.
+Socket.IO is used; Traefik backend route already includes `/socket.io`.
 
 ## 8) Healthcheck endpoint
 
@@ -101,12 +97,12 @@ If you ever seed a non-production environment:
 2. Clone this repository on VPS.
 3. Copy `.env.example` to `.env` and set strong production values.
 4. Set frontend env in `frontend/.env` (or build args) to production API/socket URLs.
-5. Ensure NPM is running on the same Docker network path for proxying.
+5. Ensure Traefik is running and attached to external Docker network `proxy`.
 6. Build and start stack: `docker compose -f docker-compose.prod.yml up -d --build`.
 7. Run Prisma migrations inside backend container (if needed): `npx prisma migrate deploy`.
-8. In NPM, create proxy host for `waizai.<yourdomain>` → `frontend:80` and request SSL.
-9. If required, create API proxy host for `api-waizai.<yourdomain>` → `backend:5000`, enable websockets, request SSL.
+8. Ensure DNS for `whatsapp.agencyfic.com` points to VPS IP.
+9. Verify Traefik detects containers and provisions Let's Encrypt certs.
 10. Verify:
-   - `https://waizai.<yourdomain>` loads UI
-   - `https://api-waizai.<yourdomain>/health` returns healthy (if API host enabled)
+   - `https://whatsapp.agencyfic.com` loads UI
+   - `https://whatsapp.agencyfic.com/api/...` endpoints return expected responses
    - Auth/login and realtime features work behind SSL.
