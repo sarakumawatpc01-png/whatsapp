@@ -8,10 +8,12 @@ const { cacheGet, cacheSet, cacheDel } = require('../config/redis');
 const logger   = require('../config/logger');
 const {
   createSession, destroySession, getSessionStatus,
-  getContactInfo, getProfilePicture, setStatus,
+  getContactInfo, getProfilePicture, setStatus, isIpRestrictedStatusCode,
 } = require('../whatsapp/engine');
 
 const CONNECT_TOKEN_TTL_SECONDS = Number(process.env.WA_CONNECT_TOKEN_TTL_SECONDS || 300);
+const TOKEN_USED_MARKER_BUFFER_SECONDS = 60;
+const MIN_TOKEN_USED_MARKER_TTL_SECONDS = 120;
 
 function resolveConnectTokenSecret() {
   return process.env.WA_CONNECT_TOKEN_SECRET || process.env.JWT_SECRET;
@@ -19,7 +21,8 @@ function resolveConnectTokenSecret() {
 
 function buildConnectionIssue(number) {
   if (!number?.lastFailureCode && !number?.lastFailureReason) return null;
-  const blockedByIp = typeof number.lastFailureCode === 'string' && number.lastFailureCode.startsWith('WA_HTTP_');
+  const statusFromCode = Number(String(number.lastFailureCode || '').replace('WA_HTTP_', ''));
+  const blockedByIp = isIpRestrictedStatusCode(statusFromCode);
   const actionableMessage = blockedByIp
     ? 'WhatsApp blocked this server IP; switch server/IP.'
     : null;
@@ -58,7 +61,11 @@ function hashTokenJti(jti) {
 }
 
 async function markConnectTokenUsed(jti) {
-  const ttl = Math.max(CONNECT_TOKEN_TTL_SECONDS + 60, 120);
+  const ttl = Math.max(
+    CONNECT_TOKEN_TTL_SECONDS + TOKEN_USED_MARKER_BUFFER_SECONDS,
+    MIN_TOKEN_USED_MARKER_TTL_SECONDS
+  );
+  // Keep the "used" marker longer than token lifetime to prevent replay around clock skew and near-expiry races.
   await cacheSet(`wa_connect_token_used:${hashTokenJti(jti)}`, true, ttl);
 }
 
@@ -336,7 +343,7 @@ async function createConnectToken(req, res, next) {
 
 async function resolveNumberFromConnectToken(req, res, next) {
   try {
-    const token = req.params.connectToken || req.query.connectToken || req.query.token;
+    const token = req.params.connectToken;
     if (!token || typeof token !== 'string') {
       return next(new AppError('Connect token is required', 401));
     }
@@ -377,7 +384,9 @@ async function getQRCodeByConnectToken(req, res, next) {
     }
 
     if (!number.qrCode) {
-      createSession(number.id, tenantId, null).catch(() => {});
+      createSession(number.id, tenantId, null).catch(err => {
+        logger.error(`createSession error for ${number.id} via connect token:`, err.message);
+      });
       return success(
         res,
         serializeQrPayload({ ...number, sessionStatus: number.sessionStatus || 'initializing', qrCode: null }, 'initializing'),

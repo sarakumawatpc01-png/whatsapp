@@ -14,8 +14,8 @@ export const WhatsAppPage = () => {
   const load = useCallback(async () => {
     try {
       const res = await api.get('/whatsapp')
-      const data = res.data?.data?.numbers || res.data?.numbers || []
-      setNumbers(Array.isArray(data) ? data : [])
+      const data = res.data?.data?.numbers || []
+      setNumbers(data)
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load numbers')
     }

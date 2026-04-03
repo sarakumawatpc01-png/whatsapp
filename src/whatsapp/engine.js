@@ -24,15 +24,21 @@ const { getOrCreateContact } = require('./contactStore');
 const activeSessions = new Map();
 const reconnectTimers = new Map();
 const manualDisconnects = new Set();
+// 405 is intentionally included because this deployment has observed WhatsApp Web rejecting
+// blocked VPS egress IPs with HTTP 405 in the connection flow.
 const WA_IP_RESTRICTED_STATUS_CODES = new Set([401, 403, 405]);
 
+function isIpRestrictedStatusCode(statusCode) {
+  return Number.isFinite(statusCode) && WA_IP_RESTRICTED_STATUS_CODES.has(statusCode);
+}
+
 function parseDisconnectStatusCode(lastDisconnect) {
-  return Number(
+  const code = Number(
     lastDisconnect?.error?.output?.statusCode
     || lastDisconnect?.error?.data?.status
     || lastDisconnect?.error?.status
-    || 0
-  ) || null;
+  );
+  return Number.isNaN(code) ? null : code;
 }
 
 function buildFailureMetadata(statusCode, isLoggedOut, isManualDisconnect) {
@@ -56,7 +62,7 @@ function buildFailureMetadata(statusCode, isLoggedOut, isManualDisconnect) {
     };
   }
 
-  if (statusCode && WA_IP_RESTRICTED_STATUS_CODES.has(statusCode)) {
+  if (isIpRestrictedStatusCode(statusCode)) {
     return {
       code: `WA_HTTP_${statusCode}`,
       reason: `WhatsApp Web endpoint rejected this server IP with HTTP ${statusCode}.`,
@@ -759,5 +765,6 @@ module.exports = {
   promoteGroupParticipant: promoteParticipant,
   demoteGroupParticipant: demoteParticipant,
   getSessionStatus,
+  isIpRestrictedStatusCode,
   normalizeToJid,
 };
