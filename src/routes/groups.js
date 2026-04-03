@@ -2,7 +2,7 @@
 const router = require('express').Router();
 const { body, param, query } = require('express-validator');
 const { protect } = require('../middleware/auth');
-const { validate } = require('../utils/requestValidation');
+const { validate, isNonEmptyString } = require('../utils/requestValidation');
 const {
   listGroups, getGroup, createGroup, updateGroupInfo,
   updateGroupSettings, addMembers, removeMember,
@@ -78,7 +78,7 @@ router.delete(
   '/:groupId/members/:jid',
   [
     param('groupId').isUUID().withMessage('groupId must be a valid id'),
-    param('jid').isString().trim().notEmpty().withMessage('jid is required'),
+    param('jid').custom(isNonEmptyString).withMessage('jid is required'),
     validate,
   ],
   removeMember
@@ -87,7 +87,7 @@ router.post(
   '/:groupId/members/:jid/promote',
   [
     param('groupId').isUUID().withMessage('groupId must be a valid id'),
-    param('jid').isString().trim().notEmpty().withMessage('jid is required'),
+    param('jid').custom(isNonEmptyString).withMessage('jid is required'),
     validate,
   ],
   promoteAdmin
@@ -96,7 +96,7 @@ router.post(
   '/:groupId/members/:jid/demote',
   [
     param('groupId').isUUID().withMessage('groupId must be a valid id'),
-    param('jid').isString().trim().notEmpty().withMessage('jid is required'),
+    param('jid').custom(isNonEmptyString).withMessage('jid is required'),
     validate,
   ],
   demoteAdmin

@@ -2,7 +2,7 @@
 const router = require('express').Router();
 const { body, param, query } = require('express-validator');
 const { protect } = require('../middleware/auth');
-const { validate } = require('../utils/requestValidation');
+const { validate, isNonEmptyString } = require('../utils/requestValidation');
 const {
   getConversations, getMessages,
   sendText, sendMedia, sendLocationMsg, sendPollMsg,
@@ -43,10 +43,10 @@ router.post(
   '/send/text',
   [
     body('numberId').isUUID().withMessage('numberId is required'),
-    body('toJid').isString().trim().notEmpty().withMessage('toJid is required'),
-    body('message').isString().trim().notEmpty().withMessage('message is required'),
+    body('toJid').custom(isNonEmptyString).withMessage('toJid is required'),
+    body('message').custom(isNonEmptyString).withMessage('message is required'),
     body('contactId').optional().isUUID().withMessage('contactId must be a valid id'),
-    body('quotedMsgId').optional().isString().trim().notEmpty().withMessage('quotedMsgId is invalid'),
+    body('quotedMsgId').optional().custom(isNonEmptyString).withMessage('quotedMsgId is invalid'),
     validate,
   ],
   sendText
@@ -55,7 +55,7 @@ router.post(
   '/send/media',
   [
     body('numberId').isUUID().withMessage('numberId is required'),
-    body('toJid').isString().trim().notEmpty().withMessage('toJid is required'),
+    body('toJid').custom(isNonEmptyString).withMessage('toJid is required'),
     body('caption').optional().isString().isLength({ max: 2000 }).withMessage('caption is too long'),
     body('contactId').optional().isUUID().withMessage('contactId must be a valid id'),
     validate,
@@ -66,7 +66,7 @@ router.post(
   '/send/location',
   [
     body('numberId').isUUID().withMessage('numberId is required'),
-    body('toJid').isString().trim().notEmpty().withMessage('toJid is required'),
+    body('toJid').custom(isNonEmptyString).withMessage('toJid is required'),
     body('lat').isFloat({ min: -90, max: 90 }).withMessage('lat must be valid'),
     body('lng').isFloat({ min: -180, max: 180 }).withMessage('lng must be valid'),
     body('name').optional().isString().isLength({ max: 200 }).withMessage('name is too long'),
@@ -79,10 +79,10 @@ router.post(
   '/send/poll',
   [
     body('numberId').isUUID().withMessage('numberId is required'),
-    body('toJid').isString().trim().notEmpty().withMessage('toJid is required'),
-    body('question').isString().trim().notEmpty().withMessage('question is required'),
+    body('toJid').custom(isNonEmptyString).withMessage('toJid is required'),
+    body('question').custom(isNonEmptyString).withMessage('question is required'),
     body('options').isArray({ min: 2 }).withMessage('options must contain at least 2 choices'),
-    body('options.*').isString().trim().notEmpty().withMessage('each option must be a non-empty string'),
+    body('options.*').custom(isNonEmptyString).withMessage('each option must be a non-empty string'),
     body('allowMultiple').optional().isBoolean().withMessage('allowMultiple must be boolean'),
     body('contactId').optional().isUUID().withMessage('contactId must be a valid id'),
     validate,
@@ -93,8 +93,8 @@ router.post(
   '/send/schedule',
   [
     body('numberId').isUUID().withMessage('numberId is required'),
-    body('toJid').isString().trim().notEmpty().withMessage('toJid is required'),
-    body('message').isString().trim().notEmpty().withMessage('message is required'),
+    body('toJid').custom(isNonEmptyString).withMessage('toJid is required'),
+    body('message').custom(isNonEmptyString).withMessage('message is required'),
     body('scheduledAt').isISO8601().withMessage('scheduledAt must be a valid ISO date'),
     body('contactId').optional().isUUID().withMessage('contactId must be a valid id'),
     validate,
@@ -107,8 +107,8 @@ router.post(
   '/react',
   [
     body('numberId').isUUID().withMessage('numberId is required'),
-    body('msgId').isString().trim().notEmpty().withMessage('msgId is required'),
-    body('emoji').isString().trim().notEmpty().withMessage('emoji is required'),
+    body('msgId').custom(isNonEmptyString).withMessage('msgId is required'),
+    body('emoji').custom(isNonEmptyString).withMessage('emoji is required'),
     validate,
   ],
   reactToMessage
