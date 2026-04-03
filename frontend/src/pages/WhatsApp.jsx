@@ -5,10 +5,12 @@ import { Card } from '../components/common/Card'
 export const WhatsAppPage = () => {
   const { api } = useAuth()
   const [numbers, setNumbers] = useState([])
+  const [selectedNumberId, setSelectedNumberId] = useState('')
   const [qr, setQr] = useState('')
   const [qrStatus, setQrStatus] = useState('')
   const [qrIssue, setQrIssue] = useState(null)
   const [error, setError] = useState('')
+  const [pollingQr, setPollingQr] = useState(false)
   const [newNumber, setNewNumber] = useState({ label: '' })
 
   const load = useCallback(async () => {
@@ -37,16 +39,27 @@ export const WhatsAppPage = () => {
   }
 
   const showQr = async (id) => {
+    setSelectedNumberId(id)
     try {
       const res = await api.get(`/whatsapp/${id}/qr`)
       const payload = res.data?.data || {}
       setQr(payload?.qrCode || payload?.qr || '')
       setQrStatus(payload?.sessionStatus || '')
       setQrIssue(payload?.issue || null)
+      const status = payload?.sessionStatus || ''
+      setPollingQr(!payload?.qrCode && status !== 'connected' && status !== 'disconnected')
     } catch (err) {
       setError(err.response?.data?.error || 'QR fetch failed')
     }
   }
+
+  useEffect(() => {
+    if (!selectedNumberId || !pollingQr) return undefined
+    const timer = setInterval(() => {
+      showQr(selectedNumberId)
+    }, 2500)
+    return () => clearInterval(timer)
+  }, [selectedNumberId, pollingQr])
 
   const disconnect = (id) => api.post(`/whatsapp/${id}/disconnect`).then(load)
   const reconnect = (id) => api.post(`/whatsapp/${id}/reconnect`).then(load)
@@ -79,6 +92,7 @@ export const WhatsAppPage = () => {
         <Card title="QR / Status">
           {qr ? <img src={qr} alt="QR" style={{ maxWidth: '100%' }} /> : <div className="act-time">Select a number</div>}
           {qrStatus && <div className="cc-desc" style={{ marginTop: 8 }}>Status: {qrStatus}</div>}
+          {pollingQr && !qr && <div className="act-time" style={{ marginTop: 8 }}>Generating QR… please wait</div>}
           {qrIssue?.reason && (
             <div className="badge red" style={{ marginTop: 8 }}>
               {qrIssue.reason}

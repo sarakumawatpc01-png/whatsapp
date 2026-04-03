@@ -45,12 +45,19 @@ function parseDisconnectStatusCode(lastDisconnect) {
 }
 
 function parseProxyList() {
-  const raw = process.env.WA_EGRESS_PROXY_URLS || '';
-  const list = raw
+  const rawList = process.env.WA_EGRESS_PROXY_URLS || '';
+  const list = rawList
     .split(',')
     .map((entry) => entry.trim())
     .filter(Boolean);
-  return [...new Set(list)];
+  const fallbackSingle = [
+    process.env.WA_EGRESS_PROXY_DEFAULT || '',
+    process.env.WA_EGRESS_PROXY_URL || '',
+  ]
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  return [...new Set([...list, ...fallbackSingle])];
 }
 
 function getProxyState(numberId, currentChoice = null) {
@@ -260,6 +267,12 @@ async function createSession(numberId, tenantId, phoneLabel) {
     logger: pino({ level: process.env.BAILEYS_LOG_LEVEL || 'error' }),
     printQRInTerminal: false,
     markOnlineOnConnect: false,
+    connectTimeoutMs: Number(process.env.WA_CONNECT_TIMEOUT_MS || 60_000),
+    defaultQueryTimeoutMs: Number(process.env.WA_QUERY_TIMEOUT_MS || 60_000),
+    keepAliveIntervalMs: Number(process.env.WA_KEEPALIVE_MS || 20_000),
+    emitOwnEvents: false,
+    syncFullHistory: false,
+    browser: ['Ubuntu', 'Chrome', '120.0.0.0'],
   };
   if (proxyState.selectedProxy) {
     socketConfig.fetchAgent = new HttpsProxyAgent(proxyState.selectedProxy);
