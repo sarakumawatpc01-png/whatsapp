@@ -12,25 +12,37 @@ const AuthContext = createContext(null)
 
 const storageKey = 'waizai_auth'
 
+const readStoredAuth = () => {
+  const raw = sessionStorage.getItem(storageKey)
+  if (!raw) return null
+
+  try {
+    return JSON.parse(raw)
+  } catch {
+    sessionStorage.removeItem(storageKey)
+    return null
+  }
+}
+
 export const AuthProvider = ({ children }) => {
   const [tokens, setTokens] = useState(() => {
-    const stored = localStorage.getItem(storageKey)
-    return stored ? JSON.parse(stored).tokens : null
+    const stored = readStoredAuth()
+    return stored?.tokens || null
   })
   const [role, setRole] = useState(() => {
-    const stored = localStorage.getItem(storageKey)
-    return stored ? JSON.parse(stored).role : null
+    const stored = readStoredAuth()
+    return stored?.role || null
   })
   const [profile, setProfile] = useState(() => {
-    const stored = localStorage.getItem(storageKey)
-    return stored ? JSON.parse(stored).profile : null
+    const stored = readStoredAuth()
+    return stored?.profile || null
   })
   const [loading, setLoading] = useState(false)
 
   const persist = useCallback(
     (nextTokens, nextRole, nextProfile) => {
       if (!nextTokens) {
-        localStorage.removeItem(storageKey)
+        sessionStorage.removeItem(storageKey)
         setTokens(null)
         setRole(nextRole ?? null)
         setProfile(nextProfile ?? null)
@@ -42,7 +54,7 @@ export const AuthProvider = ({ children }) => {
         role: nextRole ?? role,
         profile: nextProfile ?? profile,
       }
-      localStorage.setItem(storageKey, JSON.stringify(payload))
+      sessionStorage.setItem(storageKey, JSON.stringify(payload))
       setTokens(nextTokens)
       setRole(payload.role)
       setProfile(payload.profile)
