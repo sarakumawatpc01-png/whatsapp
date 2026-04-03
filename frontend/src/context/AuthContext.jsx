@@ -155,6 +155,20 @@ export const AuthProvider = ({ children }) => {
     [persist],
   )
 
+  const assumeTenantSession = useCallback(
+    ({ accessToken, refreshToken = null, tenant }) => {
+      const profilePayload = tenant
+        ? {
+            ...tenant,
+            name: tenant.ownerName || tenant.businessName || tenant.email,
+          }
+        : null
+      persist({ accessToken, refreshToken }, 'tenant', profilePayload)
+      return profilePayload
+    },
+    [persist],
+  )
+
   return (
     <AuthContext.Provider
       value={{
@@ -168,6 +182,7 @@ export const AuthProvider = ({ children }) => {
         verifyEmail,
         loginSuperAdmin,
         loginAffiliate,
+        assumeTenantSession,
         logout,
         setProfile,
       }}
