@@ -67,7 +67,7 @@ export const WhatsAppPage = () => {
                 className="form-input"
                 value={newNumber.label}
                 onChange={(e) => setNewNumber({ ...newNumber, label: e.target.value })}
-                required
+                placeholder="Optional"
               />
             </div>
             <button className="btn btn-primary" type="submit">

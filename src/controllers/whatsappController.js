@@ -12,6 +12,7 @@ const {
 } = require('../whatsapp/engine');
 
 const DEFAULT_CONNECT_TOKEN_TTL_SECONDS = 300;
+const DEFAULT_WHATSAPP_DISPLAY_NAME = 'WhatsApp Number';
 const CONNECT_TOKEN_TTL_SECONDS_RAW = Number(process.env.WA_CONNECT_TOKEN_TTL_SECONDS);
 const CONNECT_TOKEN_TTL_SECONDS = Number.isFinite(CONNECT_TOKEN_TTL_SECONDS_RAW) && CONNECT_TOKEN_TTL_SECONDS_RAW > 0
   ? Math.floor(CONNECT_TOKEN_TTL_SECONDS_RAW)
@@ -126,9 +127,12 @@ async function listNumbers(req, res, next) {
 async function addNumber(req, res, next) {
   try {
     const { displayName, label } = req.body;
-    const resolvedDisplayName = (typeof displayName === 'string' && displayName.trim())
-      ? displayName.trim()
-      : ((typeof label === 'string' && label.trim()) ? label.trim() : 'WhatsApp Number');
+    let resolvedDisplayName = DEFAULT_WHATSAPP_DISPLAY_NAME;
+    if (typeof displayName === 'string' && displayName.trim()) {
+      resolvedDisplayName = displayName.trim();
+    } else if (typeof label === 'string' && label.trim()) {
+      resolvedDisplayName = label.trim();
+    }
 
     // Check plan limit
     const tenant = await prisma.tenant.findUnique({
