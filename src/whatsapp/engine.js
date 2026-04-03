@@ -24,6 +24,58 @@ const { getOrCreateContact } = require('./contactStore');
 const activeSessions = new Map();
 const reconnectTimers = new Map();
 const manualDisconnects = new Set();
+const WA_IP_RESTRICTED_STATUS_CODES = new Set([401, 403, 405]);
+
+function parseDisconnectStatusCode(lastDisconnect) {
+  return Number(
+    lastDisconnect?.error?.output?.statusCode
+    || lastDisconnect?.error?.data?.status
+    || lastDisconnect?.error?.status
+    || 0
+  ) || null;
+}
+
+function buildFailureMetadata(statusCode, isLoggedOut, isManualDisconnect) {
+  if (isManualDisconnect) {
+    return {
+      code: 'MANUAL_DISCONNECT',
+      reason: 'Session disconnected by user action.',
+      actionableMessage: null,
+      blockedByIp: false,
+      shouldAutoReconnect: false,
+    };
+  }
+
+  if (isLoggedOut) {
+    return {
+      code: 'LOGGED_OUT',
+      reason: 'Session logged out. Reconnect and scan a fresh QR code.',
+      actionableMessage: null,
+      blockedByIp: false,
+      shouldAutoReconnect: false,
+    };
+  }
+
+  if (statusCode && WA_IP_RESTRICTED_STATUS_CODES.has(statusCode)) {
+    return {
+      code: `WA_HTTP_${statusCode}`,
+      reason: `WhatsApp Web endpoint rejected this server IP with HTTP ${statusCode}.`,
+      actionableMessage: 'WhatsApp blocked this server IP; switch server/IP.',
+      blockedByIp: true,
+      shouldAutoReconnect: false,
+    };
+  }
+
+  return {
+    code: statusCode ? `WA_DISCONNECT_${statusCode}` : 'WA_DISCONNECT_UNKNOWN',
+    reason: statusCode
+      ? `WhatsApp connection closed (status ${statusCode}).`
+      : 'WhatsApp connection closed unexpectedly.',
+    actionableMessage: null,
+    blockedByIp: false,
+    shouldAutoReconnect: true,
+  };
+}
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -165,7 +217,13 @@ async function createSession(numberId, tenantId, phoneLabel) {
         const qrDataUrl = await qrcode.toDataURL(qr);
         await prisma.tenantNumber.update({
           where: { id: numberId },
-          data: { sessionStatus: 'qr_pending', qrCode: qrDataUrl },
+          data: {
+            sessionStatus: 'qr_pending',
+            qrCode: qrDataUrl,
+            lastFailureCode: null,
+            lastFailureReason: null,
+            lastFailureAt: null,
+          },
         });
         const io = getSocketIO();
         io.to(`tenant:${tenantId}`).emit('wa:qr', { numberId, qr: qrDataUrl });
@@ -183,6 +241,9 @@ async function createSession(numberId, tenantId, phoneLabel) {
           sessionStatus: 'connected',
           phoneNumber: user ? `+${user}` : undefined,
           qrCode: null,
+          lastFailureCode: null,
+          lastFailureReason: null,
+          lastFailureAt: null,
           lastConnectedAt: new Date(),
         },
       });
@@ -191,24 +252,38 @@ async function createSession(numberId, tenantId, phoneLabel) {
     }
 
     if (connection === 'close') {
-      const statusCode = lastDisconnect?.error?.output?.statusCode;
+      const statusCode = parseDisconnectStatusCode(lastDisconnect);
       const isLoggedOut = statusCode === DisconnectReason.loggedOut;
+      const isManualDisconnect = manualDisconnects.has(numberId);
+      const failure = buildFailureMetadata(statusCode, isLoggedOut, isManualDisconnect);
       logger.warn(`WA disconnected for ${numberId}: ${statusCode || 'unknown'}`);
 
       activeSessions.delete(numberId);
       await prisma.tenantNumber.update({
         where: { id: numberId },
-        data: { sessionStatus: 'disconnected' },
+        data: {
+          sessionStatus: 'disconnected',
+          lastFailureCode: failure.code,
+          lastFailureReason: failure.reason,
+          lastFailureAt: new Date(),
+        },
       }).catch(() => {});
       const io = getSocketIO();
-      io.to(`tenant:${tenantId}`).emit('wa:disconnected', { numberId, reason: statusCode || 'closed' });
+      io.to(`tenant:${tenantId}`).emit('wa:disconnected', {
+        numberId,
+        reason: failure.reason,
+        reasonCode: failure.code,
+        statusCode: statusCode || 'closed',
+        actionableMessage: failure.actionableMessage,
+        blockedByIp: failure.blockedByIp,
+      });
 
-      if (manualDisconnects.has(numberId)) {
+      if (isManualDisconnect) {
         manualDisconnects.delete(numberId);
         return;
       }
 
-      if (!isLoggedOut) {
+      if (failure.shouldAutoReconnect) {
         if (reconnectTimers.has(numberId)) clearTimeout(reconnectTimers.get(numberId));
         const timer = setTimeout(() => {
           reconnectTimers.delete(numberId);
