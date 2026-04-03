@@ -468,7 +468,37 @@ select.form-input option{background:var(--surface2)}
 .auth-card{width:min(720px,100%);max-width:100%}
 .auth-mode-tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
 .auth-mode-tabs .tb-btn{flex:1;justify-content:center;min-width:130px}
+.auth-layout{width:min(1040px,100%);display:grid;grid-template-columns:1.1fr .9fr;gap:20px;align-items:stretch}
+.auth-side{
+  border:1px solid var(--border);
+  border-radius:var(--r);
+  background:linear-gradient(135deg,var(--surface),var(--surface2));
+  padding:24px;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+}
+.auth-side h2{font-family:var(--fh);font-size:26px;line-height:1.2;margin-bottom:8px}
+.auth-side p{color:var(--text2);font-size:13px;line-height:1.6}
+.auth-points{display:grid;gap:8px;margin-top:14px}
+.auth-point{font-size:12px;color:var(--text);display:flex;align-items:center;gap:8px}
+.auth-point .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
+.auth-card .card-head{margin-bottom:12px}
+.superadmin-users-head{grid-template-columns:40px 1.6fr 1.4fr 0.8fr 1.3fr 2.5fr}
+.superadmin-users-row{grid-template-columns:40px 1.6fr 1.4fr 0.8fr 1.3fr 2.5fr;align-items:start}
+.superadmin-user-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;justify-content:stretch}
+.superadmin-user-actions .form-input{grid-column:1/-1}
+.superadmin-inline-toggles{grid-column:1/-1;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 
 @media(max-width:1200px){.cal-layout{grid-template-columns:1fr}.ai-layout{grid-template-columns:1fr}}
 @media(max-width:1100px){.grid-4{grid-template-columns:1fr 1fr}.kpi-grid{grid-template-columns:1fr 1fr}.camp-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:900px){.overview-mid{grid-template-columns:1fr}}
+@media(max-width:980px){
+  .auth-layout{grid-template-columns:1fr}
+  .auth-side{padding:18px}
+  .superadmin-users-head,.superadmin-users-row{grid-template-columns:40px 1.5fr 1.2fr .8fr 1fr 2fr}
+}
+@media(max-width:760px){
+  .auth-wrap{padding:12px}
+  .auth-mode-tabs .tb-btn{min-width:calc(50% - 8px);flex:none}
+}
