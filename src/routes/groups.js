@@ -27,7 +27,7 @@ router.post(
   [
     body('numberId').isUUID().withMessage('numberId is required'),
     body('name').isString().trim().notEmpty().withMessage('name is required'),
-    body('participants').optional().isArray({ max: 1024 }).withMessage('participants must be an array'),
+    body('participants').optional().isArray({ max: 1024 }).withMessage('participants must be an array with max 1024 entries'),
     body('participants.*').optional().isString().trim().notEmpty().withMessage('participant jid is invalid'),
     validate,
   ],
@@ -68,7 +68,7 @@ router.post(
   '/:groupId/members',
   [
     param('groupId').isUUID().withMessage('groupId must be a valid id'),
-    body('jids').isArray({ min: 1, max: 1024 }).withMessage('jids must be a non-empty array'),
+    body('jids').isArray({ min: 1, max: 1024 }).withMessage('jids must be a non-empty array with max 1024 entries'),
     body('jids.*').isString().trim().notEmpty().withMessage('jid is invalid'),
     validate,
   ],
