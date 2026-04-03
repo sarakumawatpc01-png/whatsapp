@@ -56,8 +56,8 @@ Traefik labels are configured in `docker-compose.prod.yml`:
 - Restart policy: `unless-stopped`
 - Healthchecks: backend, postgres, redis, frontend
 - Networks:
-   - `internal` for DB/Redis/backend private communication
-   - `proxy` as external Traefik network
+  - `internal` for DB/Redis/backend private communication
+  - `proxy` as external Traefik network
 
 ## 6) Required environment configuration
 
@@ -104,5 +104,5 @@ If you ever seed a non-production environment:
 9. Verify Traefik detects containers and provisions Let's Encrypt certs.
 10. Verify:
    - `https://whatsapp.agencyfic.com` loads UI
-   - `https://whatsapp.agencyfic.com/health` returns healthy
+   - `https://whatsapp.agencyfic.com/api/...` endpoints return expected responses
    - Auth/login and realtime features work behind SSL.
