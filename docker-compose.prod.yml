@@ -42,7 +42,7 @@ services:
       PORT: 5000
       DATABASE_URL: postgresql://${POSTGRES_USER:-waizai_user}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-waizai_db}
       REDIS_URL: redis://redis:6379
-      BASE_URL: http://backend:5000
+      BASE_URL: ${BASE_URL:-https://whatsapp.agencyfic.com}
     depends_on:
       postgres:
         condition: service_healthy
@@ -59,28 +59,43 @@ services:
     networks:
       - internal
       - proxy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.whatsapp-api.rule=Host(`whatsapp.agencyfic.com`) && (PathPrefix(`/api`) || PathPrefix(`/socket.io`) || Path(`/health`))
+      - traefik.http.routers.whatsapp-api.entrypoints=websecure
+      - traefik.http.routers.whatsapp-api.tls.certresolver=letsencrypt
+      - traefik.http.routers.whatsapp-api.priority=100
+      - traefik.http.routers.whatsapp-api.service=whatsapp-api
+      - traefik.http.services.whatsapp-api.loadbalancer.server.port=5000
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:5000/api}
-        VITE_SOCKET_URL: ${VITE_SOCKET_URL:-http://localhost:5000}
+        VITE_API_URL: ${VITE_API_URL:-https://whatsapp.agencyfic.com/api}
+        VITE_SOCKET_URL: ${VITE_SOCKET_URL:-https://whatsapp.agencyfic.com}
         VITE_SUPERADMIN_SLUG: ${VITE_SUPERADMIN_SLUG:-priyanshu}
     restart: unless-stopped
     expose:
-      - "80"
+      - "4173"
     depends_on:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4173/"]
       interval: 30s
       timeout: 5s
       retries: 5
     networks:
       - proxy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.whatsapp.rule=Host(`whatsapp.agencyfic.com`)
+      - traefik.http.routers.whatsapp.entrypoints=websecure
+      - traefik.http.routers.whatsapp.tls.certresolver=letsencrypt
+      - traefik.http.routers.whatsapp.priority=1
+      - traefik.http.services.whatsapp.loadbalancer.server.port=4173
 
 volumes:
   postgres_data:
@@ -91,4 +106,5 @@ networks:
     driver: bridge
     internal: true
   proxy:
-    driver: bridge
+    external: true
+    name: proxy
