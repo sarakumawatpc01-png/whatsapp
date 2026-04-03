@@ -11,9 +11,20 @@ const {
   getContactInfo, getProfilePicture, setStatus, isIpRestrictedStatusCode,
 } = require('../whatsapp/engine');
 
-const CONNECT_TOKEN_TTL_SECONDS = Number(process.env.WA_CONNECT_TOKEN_TTL_SECONDS || 300);
+const DEFAULT_CONNECT_TOKEN_TTL_SECONDS = 300;
+const CONNECT_TOKEN_TTL_SECONDS_RAW = Number(process.env.WA_CONNECT_TOKEN_TTL_SECONDS);
+const CONNECT_TOKEN_TTL_SECONDS = Number.isFinite(CONNECT_TOKEN_TTL_SECONDS_RAW) && CONNECT_TOKEN_TTL_SECONDS_RAW > 0
+  ? Math.floor(CONNECT_TOKEN_TTL_SECONDS_RAW)
+  : DEFAULT_CONNECT_TOKEN_TTL_SECONDS;
 const TOKEN_USED_MARKER_BUFFER_SECONDS = 60;
 const MIN_TOKEN_USED_MARKER_TTL_SECONDS = 120;
+
+if (
+  process.env.WA_CONNECT_TOKEN_TTL_SECONDS
+  && CONNECT_TOKEN_TTL_SECONDS === DEFAULT_CONNECT_TOKEN_TTL_SECONDS
+) {
+  logger.warn('Invalid WA_CONNECT_TOKEN_TTL_SECONDS; falling back to default 300 seconds');
+}
 
 function resolveConnectTokenSecret() {
   return process.env.WA_CONNECT_TOKEN_SECRET || process.env.JWT_SECRET;
@@ -21,7 +32,7 @@ function resolveConnectTokenSecret() {
 
 function buildConnectionIssue(number) {
   if (!number?.lastFailureCode && !number?.lastFailureReason) return null;
-  const statusFromCode = Number(String(number.lastFailureCode || '').replace('WA_HTTP_', ''));
+  const statusFromCode = extractHttpStatusFromFailureCode(number.lastFailureCode);
   const blockedByIp = isIpRestrictedStatusCode(statusFromCode);
   const actionableMessage = blockedByIp
     ? 'WhatsApp blocked this server IP; switch server/IP.'
@@ -34,6 +45,14 @@ function buildConnectionIssue(number) {
     blockedByIp,
     lastFailureAt: number.lastFailureAt || null,
   };
+}
+
+function extractHttpStatusFromFailureCode(code) {
+  const raw = String(code || '');
+  const match = raw.match(/^WA_HTTP_(\d{3})$/);
+  if (!match) return null;
+  const parsed = Number(match[1]);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function serializeQrPayload(number, fallbackStatus = 'initializing') {

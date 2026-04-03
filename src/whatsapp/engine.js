@@ -24,8 +24,8 @@ const { getOrCreateContact } = require('./contactStore');
 const activeSessions = new Map();
 const reconnectTimers = new Map();
 const manualDisconnects = new Set();
-// 405 is intentionally included because this deployment has observed WhatsApp Web rejecting
-// blocked VPS egress IPs with HTTP 405 in the connection flow.
+// 401/403/405 are treated as blocked-restriction signals for this deployment's WA Web handshake:
+// 401/403 are standard authorization/forbidden responses and 405 was observed for blocked VPS egress.
 const WA_IP_RESTRICTED_STATUS_CODES = new Set([401, 403, 405]);
 
 function isIpRestrictedStatusCode(statusCode) {
