@@ -29,6 +29,7 @@ const manualDisconnects = new Set();
 // 401/403/405 are treated as blocked-restriction signals for this deployment's WA Web handshake:
 // 401/403 are standard authorization/forbidden responses and 405 was observed for blocked VPS egress.
 const WA_IP_RESTRICTED_STATUS_CODES = new Set([401, 403, 405]);
+const PROXY_CHOICE_TTL_SECONDS = 60 * 60 * 24 * 30;
 
 function isIpRestrictedStatusCode(statusCode) {
   return Number.isFinite(statusCode) && WA_IP_RESTRICTED_STATUS_CODES.has(statusCode);
@@ -74,7 +75,7 @@ function getProxyState(numberId, currentChoice = null) {
 
 async function persistProxyChoice(numberId, proxyUrl) {
   if (!proxyUrl) return;
-  await cacheSet(`wa_proxy_choice:${numberId}`, proxyUrl, 60 * 60 * 24 * 30).catch(() => {});
+  await cacheSet(`wa_proxy_choice:${numberId}`, proxyUrl, PROXY_CHOICE_TTL_SECONDS).catch(() => {});
 }
 
 async function rotateProxy(numberId) {

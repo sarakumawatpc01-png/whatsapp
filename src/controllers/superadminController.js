@@ -8,6 +8,7 @@ const { AppError, ValidationError } = require('../utils/errors');
 const { success, paginated } = require('../utils/response');
 const logger   = require('../config/logger');
 const { cacheSet, cacheGet, cacheDel, cacheDelPattern } = require('../config/redis');
+const MAX_EMAIL_TRANSPORT_CACHE_SIZE = 5;
 
 // ── TOKEN HELPERS ─────────────────────────────────────────────
 function generateAdminTokens(adminId) {
@@ -82,7 +83,7 @@ async function getReusableTransport() {
     pool: true,
   });
   emailTransportCache.set(cacheKey, transport);
-  if (emailTransportCache.size > 5) {
+  if (emailTransportCache.size > MAX_EMAIL_TRANSPORT_CACHE_SIZE) {
     const [firstKey] = emailTransportCache.keys();
     emailTransportCache.delete(firstKey);
   }
@@ -91,12 +92,15 @@ async function getReusableTransport() {
 }
 
 function sanitizeCustomEmailHtml(input) {
-  const source = String(input || '');
+  const source = String(input || '').slice(0, 50000);
   if (!source.trim()) return '';
-  let safeHtml = source.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '');
-  safeHtml = safeHtml.replace(/\son[a-z]+\s*=\s*(['"]).*?\1/gi, '');
-  safeHtml = safeHtml.replace(/javascript:/gi, '');
-  return safeHtml;
+  const escaped = source
+    .split('&').join('&amp;')
+    .split('<').join('&lt;')
+    .split('>').join('&gt;')
+    .split('"').join('&quot;')
+    .split("'").join('&#39;');
+  return `<div style="white-space:pre-wrap">${escaped}</div>`;
 }
 
 // ── LOGIN ─────────────────────────────────────────────────────

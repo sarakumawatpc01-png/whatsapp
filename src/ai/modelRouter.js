@@ -154,11 +154,14 @@ async function callSarvam(systemPrompt, messages, model, maxChars) {
 async function callOpenRouter(systemPrompt, messages, model, maxChars) {
   const apiKey = await getSetting('openrouter_api_key', { fallbackEnvKey: 'OPENROUTER_API_KEY' });
   if (!apiKey) throw new Error('OpenRouter API key is not configured');
+  const targetModel = model && model.startsWith('openrouter/')
+    ? model.replace(/^openrouter\//, '')
+    : (model || 'openai/gpt-4o-mini');
 
   const response = await axios.post(
     'https://openrouter.ai/api/v1/chat/completions',
     {
-      model: model || 'openai/gpt-4o-mini',
+      model: targetModel,
       max_tokens: Math.min(Math.ceil(maxChars / 3.5), 1024),
       messages: [
         { role: 'system', content: systemPrompt },
@@ -190,6 +193,7 @@ function getProvider(model) {
   if (model.startsWith('deepseek'))  return 'deepseek';
   if (model.startsWith('sarvam'))    return 'sarvam';
   if (model.startsWith('openrouter/')) return 'openrouter';
+  if (model.includes('/')) return 'openrouter';
   return 'anthropic';
 }
 

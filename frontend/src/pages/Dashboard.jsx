@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Card } from '../components/common/Card'
 import { useAuth } from '../context/AuthContext'
 
@@ -66,9 +67,9 @@ export const DashboardPage = () => {
           <h2>Welcome back</h2>
           <p>All your WhatsApp automation, AI, campaigns, billing and analytics in one place.</p>
           <div style={{ marginTop: 10 }}>
-            <a className="btn btn-primary" href="/walkthrough" style={{ textDecoration: 'none' }}>
+            <Link className="btn btn-primary" to="/walkthrough" style={{ textDecoration: 'none' }}>
               Start Interactive Walkthrough
-            </a>
+            </Link>
           </div>
         </div>
         <div className="ai-master-toggle">
