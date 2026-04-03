@@ -9,7 +9,7 @@ export const WhatsAppPage = () => {
   const [qrStatus, setQrStatus] = useState('')
   const [qrIssue, setQrIssue] = useState(null)
   const [error, setError] = useState('')
-  const [newNumber, setNewNumber] = useState({ phoneNumber: '', label: '' })
+  const [newNumber, setNewNumber] = useState({ label: '' })
 
   const load = useCallback(async () => {
     try {
@@ -29,7 +29,7 @@ export const WhatsAppPage = () => {
     e.preventDefault()
     try {
       await api.post('/whatsapp', newNumber)
-      setNewNumber({ phoneNumber: '', label: '' })
+      setNewNumber({ label: '' })
       load()
     } catch (err) {
       setError(err.response?.data?.error || 'Add failed')
@@ -62,20 +62,12 @@ export const WhatsAppPage = () => {
         <Card title="Add number">
           <form onSubmit={addNumber}>
             <div className="form-group">
-              <label className="form-label">Phone number</label>
-              <input
-                className="form-input"
-                value={newNumber.phoneNumber}
-                onChange={(e) => setNewNumber({ ...newNumber, phoneNumber: e.target.value })}
-                required
-              />
-            </div>
-            <div className="form-group">
               <label className="form-label">Label</label>
               <input
                 className="form-input"
                 value={newNumber.label}
                 onChange={(e) => setNewNumber({ ...newNumber, label: e.target.value })}
+                required
               />
             </div>
             <button className="btn btn-primary" type="submit">
@@ -103,7 +95,7 @@ export const WhatsAppPage = () => {
               <span className="badge green">{n.sessionStatus}</span>
               <span className="cc-date">{n.createdAt}</span>
             </div>
-            <div className="cc-name">{n.label || n.phoneNumber}</div>
+            <div className="cc-name">{n.displayName || n.phoneNumber}</div>
             <div className="cc-desc">Device: {n.device || 'N/A'}</div>
             <div className="cc-actions">
               <button className="cc-btn" onClick={() => showQr(n.id)}>

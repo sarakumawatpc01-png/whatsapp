@@ -125,7 +125,10 @@ async function listNumbers(req, res, next) {
 // ── ADD NUMBER ────────────────────────────────────────────────
 async function addNumber(req, res, next) {
   try {
-    const { displayName } = req.body;
+    const { displayName, label } = req.body;
+    const resolvedDisplayName = (typeof displayName === 'string' && displayName.trim())
+      ? displayName.trim()
+      : ((typeof label === 'string' && label.trim()) ? label.trim() : 'WhatsApp Number');
 
     // Check plan limit
     const tenant = await prisma.tenant.findUnique({
@@ -141,15 +144,15 @@ async function addNumber(req, res, next) {
     const number = await prisma.tenantNumber.create({
       data: {
         tenantId: req.tenantId,
-        phoneNumber: 'pending',
-        displayName: displayName || 'WhatsApp Number',
+        phoneNumber: `pending-${crypto.randomUUID()}`,
+        displayName: resolvedDisplayName,
         sessionStatus: 'disconnected',
         isDefault: tenant.numbers.length === 0,
       },
     });
 
     // Trigger QR generation (async)
-    createSession(number.id, req.tenantId, displayName).catch(err => {
+    createSession(number.id, req.tenantId, resolvedDisplayName).catch(err => {
       logger.error(`createSession error for ${number.id}:`, err.message);
     });
 
