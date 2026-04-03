@@ -16,8 +16,7 @@ RUN npm run build
 FROM node:20-alpine
 WORKDIR /app
 COPY --from=build /app/dist /app/dist
-RUN npm i -g serve
 EXPOSE 4173
 HEALTHCHECK --interval=30s --timeout=5s --retries=5 --start-period=10s \
   CMD wget -qO- http://127.0.0.1:4173/ >/dev/null || exit 1
-CMD ["serve", "-s", "/app/dist", "-l", "4173"]
+CMD ["npx", "serve", "-s", "/app/dist", "-l", "4173"]
