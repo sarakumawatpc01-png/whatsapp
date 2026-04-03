@@ -11,6 +11,7 @@ import { createApiClient, defaultBaseURL } from '../api/client'
 const AuthContext = createContext(null)
 
 const storageKey = 'waizai_auth'
+const impersonationStorageKey = 'waizai_impersonation_admin'
 
 const readStoredAuth = () => {
   const raw = sessionStorage.getItem(storageKey)
@@ -63,6 +64,7 @@ export const AuthProvider = ({ children }) => {
   )
 
   const logout = useCallback(() => {
+    sessionStorage.removeItem(impersonationStorageKey)
     persist(null, null, null)
   }, [persist])
 
@@ -157,6 +159,16 @@ export const AuthProvider = ({ children }) => {
 
   const assumeTenantSession = useCallback(
     ({ accessToken, refreshToken = null, tenant }) => {
+      if (role === 'superadmin' && tokens?.accessToken) {
+        sessionStorage.setItem(
+          impersonationStorageKey,
+          JSON.stringify({
+            tokens,
+            role,
+            profile,
+          }),
+        )
+      }
       const profilePayload = tenant
         ? {
             ...tenant,
@@ -166,8 +178,25 @@ export const AuthProvider = ({ children }) => {
       persist({ accessToken, refreshToken }, 'tenant', profilePayload)
       return profilePayload
     },
-    [persist],
+    [persist, profile, role, tokens],
   )
+
+  const stopImpersonation = useCallback(() => {
+    const raw = sessionStorage.getItem(impersonationStorageKey)
+    if (!raw) return false
+    try {
+      const saved = JSON.parse(raw)
+      sessionStorage.removeItem(impersonationStorageKey)
+      if (saved?.tokens?.accessToken && saved?.role === 'superadmin') {
+        persist(saved.tokens, 'superadmin', saved.profile || null)
+        return true
+      }
+      return false
+    } catch {
+      sessionStorage.removeItem(impersonationStorageKey)
+      return false
+    }
+  }, [persist])
 
   return (
     <AuthContext.Provider
@@ -183,6 +212,8 @@ export const AuthProvider = ({ children }) => {
         loginSuperAdmin,
         loginAffiliate,
         assumeTenantSession,
+        stopImpersonation,
+        isImpersonating: Boolean(sessionStorage.getItem(impersonationStorageKey)),
         logout,
         setProfile,
       }}

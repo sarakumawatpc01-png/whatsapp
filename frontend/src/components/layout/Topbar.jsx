@@ -2,7 +2,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 
 export const Topbar = () => {
-  const { logout, profile, role } = useAuth()
+  const { logout, profile, role, isImpersonating, stopImpersonation } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -44,6 +44,16 @@ export const Topbar = () => {
       <button className="tb-btn ghost" onClick={() => navigate('/inbox')}>
         Inbox
       </button>
+      {role === 'tenant' && isImpersonating && (
+        <button
+          className="tb-btn ghost"
+          onClick={() => {
+            if (stopImpersonation()) navigate('/superadmin')
+          }}
+        >
+          Back to Superadmin
+        </button>
+      )}
       <button className="tb-btn primary" onClick={logout}>
         Logout
       </button>

@@ -370,8 +370,12 @@ export const SuperadminPage = () => {
         setError('Both plan name and display name are required')
         return
       }
-      if (Number(newPlan.price) < 0 || Number(newPlan.maxAiCalls) < 1) {
-        setError('Price must be non-negative and max AI calls must be at least 1')
+      if (Number(newPlan.price) < 0) {
+        setError('Price must be non-negative')
+        return
+      }
+      if (Number(newPlan.maxAiCalls) < 1) {
+        setError('Max AI calls must be at least 1')
         return
       }
       await api.post('/superadmin/plans', {
@@ -625,7 +629,7 @@ export const SuperadminPage = () => {
                 <div className="activity-item" key={plan.id}>
                   <div className="act-dot" style={{ background: plan.isActive ? '#00E676' : '#FF8F00' }} />
                 <div className="act-text">
-                    {plan.displayName} ({plan.name}) · {formatPrice(plan.price)}
+                    {plan.displayName} [ID: {plan.name}] · {formatPrice(plan.price)}
                     <div className="act-time">
                       AI calls: {plan.maxAiCalls} · Msg gap: {plan.minMsgGapSeconds}s · Buttons:{' '}
                       {String(plan.buttonsEnabled)}
@@ -793,7 +797,12 @@ export const SuperadminPage = () => {
                     </option>
                   ))}
                 </select>
-                <button className="ct-act" onClick={() => assignPlanToUser(u.id)} style={{ marginTop: 6 }}>
+                <button
+                  className="ct-act"
+                  onClick={() => assignPlanToUser(u.id)}
+                  style={{ marginTop: 6 }}
+                  disabled={!userPlanSelection[u.id]}
+                >
                   Assign plan
                 </button>
               </div>
