@@ -98,8 +98,7 @@ export const AuthPage = () => {
             <div className="badge green">Unified login</div>
             <h2>WaizAI Platform Access</h2>
             <p>
-              Tenant, superadmin, and affiliate login in one aligned experience with direct access to platform
-              controls.
+              Unified login experience for tenant, superadmin, and affiliate accounts with direct platform access.
             </p>
             <div className="auth-points">
               <div className="auth-point">

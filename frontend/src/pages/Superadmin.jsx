@@ -252,7 +252,7 @@ export const SuperadminPage = () => {
 
   const saveApiKey = async (key) =>
     withAction(async () => {
-      const value = String(apiKeyForm[key] || '').trim()
+      const value = (apiKeyForm[key] || '').trim()
       if (!value) {
         setError(`Please provide value for ${key}`)
         return
@@ -301,7 +301,7 @@ export const SuperadminPage = () => {
 
   const resetUserPassword = async (userId) =>
     withAction(async () => {
-      const newPassword = String(newPasswordByUser[userId] || '')
+      const newPassword = newPasswordByUser[userId] || ''
       if (!newPassword || newPassword.length < 8) {
         setError('New password must be at least 8 characters')
         return
@@ -428,7 +428,7 @@ export const SuperadminPage = () => {
     <div className="page active">
       <div className="section-title">Superadmin Control</div>
       <div className="section-sub">
-        Full control panel for settings, users, password reset, plan/package management, impersonation, and API providers.
+        Full control panel for settings, options, users, password reset, plan/package management, impersonation, and API providers.
       </div>
       {loading && <div className="badge blue">Loading...</div>}
       {error && <div className="badge red">{error}</div>}
@@ -756,7 +756,7 @@ export const SuperadminPage = () => {
             <div className="ct-row superadmin-users-row" key={u.id}>
               <input type="checkbox" className="ct-checkbox" />
               <div className="ct-name-cell">
-                <div className="ct-av">{u.businessName?.[0] || 'U'}</div>
+                <div className="ct-av">{u.businessName?.[0] || u.ownerName?.[0] || 'U'}</div>
                 <div>
                   <div className="ct-name">{u.businessName || u.ownerName}</div>
                   <div className="ct-phone">{u.id}</div>
