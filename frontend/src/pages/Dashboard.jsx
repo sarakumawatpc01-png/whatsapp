@@ -65,6 +65,11 @@ export const DashboardPage = () => {
         <div className="ow-text">
           <h2>Welcome back</h2>
           <p>All your WhatsApp automation, AI, campaigns, billing and analytics in one place.</p>
+          <div style={{ marginTop: 10 }}>
+            <a className="btn btn-primary" href="/walkthrough" style={{ textDecoration: 'none' }}>
+              Start Interactive Walkthrough
+            </a>
+          </div>
         </div>
         <div className="ai-master-toggle">
           <div className="amt-label">System status</div>

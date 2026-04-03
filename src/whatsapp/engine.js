@@ -13,6 +13,7 @@ const qrcode = require('qrcode');
 const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
+const { HttpsProxyAgent } = require('https-proxy-agent');
 const prisma = require('../config/database');
 const logger = require('../config/logger');
 const { getSocketIO } = require('../socket/socketManager');
@@ -39,6 +40,58 @@ function parseDisconnectStatusCode(lastDisconnect) {
     || lastDisconnect?.error?.status
   );
   return Number.isNaN(code) ? null : code;
+}
+
+function parseProxyList() {
+  const raw = process.env.WA_EGRESS_PROXY_URLS || '';
+  const list = raw
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  return [...new Set(list)];
+}
+
+function getProxyState(numberId) {
+  const proxies = parseProxyList();
+  const state = { proxies, selectedProxy: null, selectedProxyIndex: -1 };
+  if (!proxies.length) return state;
+
+  const hints = [numberId, process.env.WA_EGRESS_PROXY_DEFAULT || '', process.env.WA_EGRESS_PROXY_URL || ''];
+  for (const hint of hints) {
+    const idx = proxies.findIndex((url) => url === hint);
+    if (idx >= 0) {
+      state.selectedProxy = proxies[idx];
+      state.selectedProxyIndex = idx;
+      return state;
+    }
+  }
+
+  state.selectedProxy = proxies[0];
+  state.selectedProxyIndex = 0;
+  return state;
+}
+
+async function persistProxyChoice(numberId, proxyUrl) {
+  if (!proxyUrl) return;
+  await prisma.tenantNumber.update({
+    where: { id: numberId },
+    data: { sessionFilePath: proxyUrl },
+  }).catch(() => {});
+}
+
+async function rotateProxy(numberId) {
+  const proxies = parseProxyList();
+  if (!proxies.length) return null;
+  const row = await prisma.tenantNumber.findUnique({
+    where: { id: numberId },
+    select: { sessionFilePath: true },
+  });
+  const current = row?.sessionFilePath || null;
+  const currentIndex = proxies.findIndex((url) => url === current);
+  const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % proxies.length : 0;
+  const nextProxy = proxies[nextIndex];
+  await persistProxyChoice(numberId, nextProxy);
+  return nextProxy;
 }
 
 function buildFailureMetadata(statusCode, isLoggedOut, isManualDisconnect) {
@@ -205,12 +258,17 @@ async function createSession(numberId, tenantId, phoneLabel) {
   logger.info(`Creating WA session for number: ${numberId} (tenant: ${tenantId})`);
 
   const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
-  const sock = makeWASocket({
+  const proxyState = getProxyState(numberId);
+  const socketConfig = {
     auth: state,
     logger: pino({ level: process.env.BAILEYS_LOG_LEVEL || 'error' }),
     printQRInTerminal: false,
     markOnlineOnConnect: false,
-  });
+  };
+  if (proxyState.selectedProxy) {
+    socketConfig.fetchAgent = new HttpsProxyAgent(proxyState.selectedProxy);
+  }
+  const sock = makeWASocket(socketConfig);
 
   sock.ev.on('creds.update', saveCreds);
 
@@ -241,6 +299,9 @@ async function createSession(numberId, tenantId, phoneLabel) {
     if (connection === 'open') {
       logger.info(`✅ WhatsApp ready for ${numberId}`);
       const user = sock.user?.id ? sock.user.id.split(':')[0] : null;
+      if (proxyState.selectedProxy) {
+        await persistProxyChoice(numberId, proxyState.selectedProxy);
+      }
       await prisma.tenantNumber.update({
         where: { id: numberId },
         data: {
@@ -295,6 +356,16 @@ async function createSession(numberId, tenantId, phoneLabel) {
           reconnectTimers.delete(numberId);
           createSession(numberId, tenantId, phoneLabel).catch(err => {
             logger.error(`Auto-reconnect failed for ${numberId}:`, err.message);
+          });
+        }, Number(process.env.WA_RECONNECT_DELAY_MS || 3000));
+        reconnectTimers.set(numberId, timer);
+      } else if (failure.blockedByIp && proxyState.proxies.length > 1) {
+        const timer = setTimeout(async () => {
+          reconnectTimers.delete(numberId);
+          const nextProxy = await rotateProxy(numberId).catch(() => null);
+          logger.warn(`WA blocked for ${numberId}; rotating egress proxy to ${nextProxy || 'next'}`);
+          createSession(numberId, tenantId, phoneLabel).catch(err => {
+            logger.error(`Proxy-rotated reconnect failed for ${numberId}:`, err.message);
           });
         }, Number(process.env.WA_RECONNECT_DELAY_MS || 3000));
         reconnectTimers.set(numberId, timer);

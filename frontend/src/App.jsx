@@ -17,6 +17,7 @@ import { GroupsPage } from './pages/Groups'
 import { WhatsAppPage } from './pages/WhatsApp'
 import { SuperadminPage } from './pages/Superadmin'
 import { AffiliatePage } from './pages/Affiliate'
+import { WalkthroughPage } from './pages/Walkthrough'
 
 const Protected = ({ roles, children }) => {
   const { tokens, role } = useAuth()
@@ -45,6 +46,7 @@ function App() {
       >
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/walkthrough" element={<WalkthroughPage />} />
         <Route path="/inbox" element={<InboxPage />} />
         <Route path="/contacts" element={<ContactsPage />} />
         <Route path="/campaigns" element={<CampaignsPage />} />

@@ -8,7 +8,7 @@ const axios = require('axios');
 const prisma = require('../config/database');
 const logger = require('../config/logger');
 const { buildConversationHistory } = require('./promptBuilder');
-const { cacheGet } = require('../config/redis');
+const { getSetting } = require('../services/settingsService');
 
 /**
  * Main entry point for AI reply generation.
@@ -35,6 +35,7 @@ async function generateAIReply({ systemPrompt, history, userMessage, tenantId, m
       case 'openai':    return await callOpenAI(systemPrompt, trimmedMessages, model, maxChars);
       case 'deepseek':  return await callDeepSeek(systemPrompt, trimmedMessages, model, maxChars);
       case 'sarvam':    return await callSarvam(systemPrompt, trimmedMessages, model, maxChars);
+      case 'openrouter': return await callOpenRouter(systemPrompt, trimmedMessages, model, maxChars);
       default:          return await callClaude(systemPrompt, trimmedMessages, 'claude-sonnet-4-6', maxChars);
     }
   } catch (err) {
@@ -50,7 +51,8 @@ async function generateAIReply({ systemPrompt, history, userMessage, tenantId, m
 
 // ── CLAUDE (Anthropic) ────────────────────────────────────────
 async function callClaude(systemPrompt, messages, model, maxChars) {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const apiKey = await getSetting('anthropic_api_key', { fallbackEnvKey: 'ANTHROPIC_API_KEY' });
+  const client = new Anthropic({ apiKey });
 
   const response = await client.messages.create({
     model: model || 'claude-sonnet-4-6',
@@ -70,7 +72,8 @@ async function callClaude(systemPrompt, messages, model, maxChars) {
 
 // ── GPT-4o (OpenAI) ───────────────────────────────────────────
 async function callOpenAI(systemPrompt, messages, model, maxChars) {
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const apiKey = await getSetting('openai_api_key', { fallbackEnvKey: 'OPENAI_API_KEY' });
+  const client = new OpenAI({ apiKey });
 
   const response = await client.chat.completions.create({
     model: model || 'gpt-4o',
@@ -92,8 +95,9 @@ async function callOpenAI(systemPrompt, messages, model, maxChars) {
 
 // ── DeepSeek ─────────────────────────────────────────────────
 async function callDeepSeek(systemPrompt, messages, model, maxChars) {
+  const apiKey = await getSetting('deepseek_api_key', { fallbackEnvKey: 'DEEPSEEK_API_KEY' });
   const client = new OpenAI({
-    apiKey: process.env.DEEPSEEK_API_KEY,
+    apiKey,
     baseURL: 'https://api.deepseek.com',
   });
 
@@ -117,9 +121,7 @@ async function callDeepSeek(systemPrompt, messages, model, maxChars) {
 
 // ── Sarvam AI (Indian language specialist) ────────────────────
 async function callSarvam(systemPrompt, messages, model, maxChars) {
-  // Combine history into single text for Sarvam's API format
-  const conversationText = messages.map(m => `${m.role}: ${m.content}`).join('\n');
-  const fullPrompt = `${systemPrompt}\n\n${conversationText}\nassistant:`;
+  const apiKey = await getSetting('sarvam_api_key', { fallbackEnvKey: 'SARVAM_API_KEY' });
 
   const response = await axios.post(
     'https://api.sarvam.ai/v1/chat/completions',
@@ -133,7 +135,7 @@ async function callSarvam(systemPrompt, messages, model, maxChars) {
     },
     {
       headers: {
-        'Authorization': `Bearer ${process.env.SARVAM_API_KEY}`,
+        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       timeout: 15000,
@@ -148,6 +150,38 @@ async function callSarvam(systemPrompt, messages, model, maxChars) {
   return { text: truncate(text, maxChars), provider: 'sarvam', model, inputTokens, outputTokens, costUsd };
 }
 
+// ── OpenRouter ────────────────────────────────────────────────
+async function callOpenRouter(systemPrompt, messages, model, maxChars) {
+  const apiKey = await getSetting('openrouter_api_key', { fallbackEnvKey: 'OPENROUTER_API_KEY' });
+  if (!apiKey) throw new Error('OpenRouter API key is not configured');
+
+  const response = await axios.post(
+    'https://openrouter.ai/api/v1/chat/completions',
+    {
+      model: model || 'openai/gpt-4o-mini',
+      max_tokens: Math.min(Math.ceil(maxChars / 3.5), 1024),
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...messages,
+      ],
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      timeout: 20000,
+    }
+  );
+
+  const text = response.data?.choices?.[0]?.message?.content || '';
+  const inputTokens = response.data?.usage?.prompt_tokens || 0;
+  const outputTokens = response.data?.usage?.completion_tokens || 0;
+  const costUsd = Number(response.data?.usage?.cost || 0);
+
+  return { text: truncate(text, maxChars), provider: 'openrouter', model, inputTokens, outputTokens, costUsd };
+}
+
 // ── HELPERS ───────────────────────────────────────────────────
 function getProvider(model) {
   if (!model) return 'anthropic';
@@ -155,6 +189,7 @@ function getProvider(model) {
   if (model.startsWith('gpt'))       return 'openai';
   if (model.startsWith('deepseek'))  return 'deepseek';
   if (model.startsWith('sarvam'))    return 'sarvam';
+  if (model.startsWith('openrouter/') || model.includes('/')) return 'openrouter';
   return 'anthropic';
 }
 
