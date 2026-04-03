@@ -169,7 +169,7 @@ async function enrollContact(req, res, next) {
 // ── GET ENROLLMENTS FOR A SEQUENCE ────────────────────────────
 async function getEnrollments(req, res, next) {
   try {
-    const { sequenceId } = req.params;
+    const sequenceId = req.params.sequenceId || req.query.sequenceId;
     const page  = parseInt(req.query.page)  || 1;
     const limit = parseInt(req.query.limit) || 20;
     const skip  = (page - 1) * limit;

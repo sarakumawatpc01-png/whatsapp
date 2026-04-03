@@ -1,6 +1,10 @@
 const { validationResult } = require('express-validator');
 const { ValidationError } = require('./errors');
 
+function isNonEmptyString(value) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
 function validate(req, res, next) {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -10,4 +14,4 @@ function validate(req, res, next) {
   next();
 }
 
-module.exports = { validate };
+module.exports = { validate, isNonEmptyString };

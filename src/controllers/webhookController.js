@@ -33,7 +33,13 @@ async function handleRazorpayWebhook(req, res) {
       .update(req.body) // raw Buffer body
       .digest('hex');
 
-    if (expectedSig !== signature) {
+    const expectedBuffer = Buffer.from(expectedSig, 'utf8');
+    const receivedBuffer = Buffer.from(signature, 'utf8');
+
+    if (
+      expectedBuffer.length !== receivedBuffer.length
+      || !crypto.timingSafeEqual(expectedBuffer, receivedBuffer)
+    ) {
       logger.warn('Razorpay webhook signature mismatch — ignored');
       return;
     }
