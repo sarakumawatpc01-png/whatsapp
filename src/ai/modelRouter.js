@@ -189,7 +189,7 @@ function getProvider(model) {
   if (model.startsWith('gpt'))       return 'openai';
   if (model.startsWith('deepseek'))  return 'deepseek';
   if (model.startsWith('sarvam'))    return 'sarvam';
-  if (model.startsWith('openrouter/') || model.includes('/')) return 'openrouter';
+  if (model.startsWith('openrouter/')) return 'openrouter';
   return 'anthropic';
 }
 

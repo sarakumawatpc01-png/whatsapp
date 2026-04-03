@@ -38,6 +38,67 @@ function toBooleanString(value) {
   return 'false';
 }
 
+const emailTransportCache = new Map();
+
+async function getEmailRuntimeConfig() {
+  const keyList = ['smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_secure', 'email_from', 'email_from_name'];
+  const settings = await prisma.globalSetting.findMany({ where: { key: { in: keyList } } });
+  const settingMap = settings.reduce((acc, item) => {
+    acc[item.key] = item.value;
+    return acc;
+  }, {});
+  return {
+    smtpHost: settingMap.smtp_host || 'smtp.sendgrid.net',
+    smtpPort: Number(settingMap.smtp_port || 587),
+    smtpSecure: toBooleanString(settingMap.smtp_secure || 'false') === 'true',
+    smtpUser: settingMap.smtp_user || 'apikey',
+    smtpPass: settingMap.smtp_pass || process.env.SENDGRID_API_KEY,
+    fromEmail: settingMap.email_from || process.env.EMAIL_FROM || 'noreply@waizai.com',
+    fromName: settingMap.email_from_name || process.env.EMAIL_FROM_NAME || 'WaizAI',
+  };
+}
+
+function getTransportCacheKey(cfg) {
+  return [
+    cfg.smtpHost,
+    cfg.smtpPort,
+    cfg.smtpSecure ? '1' : '0',
+    cfg.smtpUser,
+    String(cfg.smtpPass || '').slice(0, 8),
+  ].join(':');
+}
+
+async function getReusableTransport() {
+  const cfg = await getEmailRuntimeConfig();
+  if (!cfg.smtpPass) throw new AppError('SMTP password/API key is not configured', 400);
+  const cacheKey = getTransportCacheKey(cfg);
+  if (emailTransportCache.has(cacheKey)) return { transport: emailTransportCache.get(cacheKey), cfg };
+
+  const transport = nodemailer.createTransport({
+    host: cfg.smtpHost,
+    port: cfg.smtpPort,
+    secure: cfg.smtpSecure,
+    auth: { user: cfg.smtpUser, pass: cfg.smtpPass },
+    pool: true,
+  });
+  emailTransportCache.set(cacheKey, transport);
+  if (emailTransportCache.size > 5) {
+    const [firstKey] = emailTransportCache.keys();
+    emailTransportCache.delete(firstKey);
+  }
+
+  return { transport, cfg };
+}
+
+function sanitizeCustomEmailHtml(input) {
+  const source = String(input || '');
+  if (!source.trim()) return '';
+  let safeHtml = source.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '');
+  safeHtml = safeHtml.replace(/\son[a-z]+\s*=\s*(['"]).*?\1/gi, '');
+  safeHtml = safeHtml.replace(/javascript:/gi, '');
+  return safeHtml;
+}
+
 // ── LOGIN ─────────────────────────────────────────────────────
 async function superAdminLogin(req, res, next) {
   try {
@@ -1515,30 +1576,10 @@ async function testEmailSettings(req, res, next) {
   try {
     const { to } = req.body || {};
     if (!to) return next(new ValidationError('to is required'));
-
-    const keyList = ['smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_secure', 'email_from', 'email_from_name'];
-    const settings = await prisma.globalSetting.findMany({ where: { key: { in: keyList } } });
-    const settingMap = settings.reduce((acc, item) => {
-      acc[item.key] = item.value;
-      return acc;
-    }, {});
-
-    const smtpHost = settingMap.smtp_host || 'smtp.sendgrid.net';
-    const smtpPort = Number(settingMap.smtp_port || 587);
-    const smtpSecure = toBooleanString(settingMap.smtp_secure || 'false') === 'true';
-    const smtpUser = settingMap.smtp_user || 'apikey';
-    const smtpPass = settingMap.smtp_pass || process.env.SENDGRID_API_KEY;
-    if (!smtpPass) return next(new AppError('SMTP password/API key is not configured', 400));
-
-    const transport = nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: smtpSecure,
-      auth: { user: smtpUser, pass: smtpPass },
-    });
+    const { transport, cfg } = await getReusableTransport();
 
     await transport.sendMail({
-      from: `"${settingMap.email_from_name || process.env.EMAIL_FROM_NAME || 'WaizAI'}" <${settingMap.email_from || process.env.EMAIL_FROM || 'noreply@waizai.com'}>`,
+      from: `"${cfg.fromName}" <${cfg.fromEmail}>`,
       to,
       subject: 'WaizAI Superadmin test email',
       text: 'This is a test email from WaizAI superadmin panel.',
@@ -1566,34 +1607,19 @@ async function sendCustomEmail(req, res, next) {
     if (!to || !subject || (!html && !text)) {
       return next(new ValidationError('to, subject and one of html/text are required'));
     }
-
-    const keyList = ['smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_secure', 'email_from', 'email_from_name'];
-    const settings = await prisma.globalSetting.findMany({ where: { key: { in: keyList } } });
-    const settingMap = settings.reduce((acc, item) => {
-      acc[item.key] = item.value;
-      return acc;
-    }, {});
-
-    const smtpHost = settingMap.smtp_host || 'smtp.sendgrid.net';
-    const smtpPort = Number(settingMap.smtp_port || 587);
-    const smtpSecure = toBooleanString(settingMap.smtp_secure || 'false') === 'true';
-    const smtpUser = settingMap.smtp_user || 'apikey';
-    const smtpPass = settingMap.smtp_pass || process.env.SENDGRID_API_KEY;
-    if (!smtpPass) return next(new AppError('SMTP password/API key is not configured', 400));
-
-    const transport = nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: smtpSecure,
-      auth: { user: smtpUser, pass: smtpPass },
-    });
+    const { transport, cfg } = await getReusableTransport();
+    const sanitizedHtml = html ? sanitizeCustomEmailHtml(html) : undefined;
+    const normalizedText = text ? String(text).slice(0, 20000) : undefined;
+    if (!sanitizedHtml && !normalizedText) {
+      return next(new ValidationError('Email body is empty after sanitization'));
+    }
 
     await transport.sendMail({
-      from: `"${settingMap.email_from_name || process.env.EMAIL_FROM_NAME || 'WaizAI'}" <${settingMap.email_from || process.env.EMAIL_FROM || 'noreply@waizai.com'}>`,
+      from: `"${cfg.fromName}" <${cfg.fromEmail}>`,
       to,
       subject,
-      html: html || undefined,
-      text: text || undefined,
+      html: sanitizedHtml,
+      text: normalizedText,
     });
 
     await prisma.adminAction.create({

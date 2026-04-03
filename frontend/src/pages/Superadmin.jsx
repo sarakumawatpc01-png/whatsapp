@@ -10,6 +10,18 @@ const safeList = (res) => {
   return []
 }
 
+const apiKeyDefs = [
+  { key: 'anthropic_api_key', label: 'Anthropic API Key' },
+  { key: 'openai_api_key', label: 'OpenAI API Key' },
+  { key: 'deepseek_api_key', label: 'DeepSeek API Key' },
+  { key: 'sarvam_api_key', label: 'Sarvam API Key' },
+  { key: 'openrouter_api_key', label: 'OpenRouter API Key' },
+  { key: 'sendgrid_api_key', label: 'SendGrid API Key' },
+  { key: 'razorpay_key_id', label: 'Razorpay Key ID' },
+  { key: 'razorpay_key_secret', label: 'Razorpay Key Secret' },
+  { key: 'razorpay_webhook_secret', label: 'Razorpay Webhook Secret' },
+]
+
 export const SuperadminPage = () => {
   const { api, role } = useAuth()
   const [loading, setLoading] = useState(false)
@@ -246,9 +258,9 @@ export const SuperadminPage = () => {
 
       <Card title="API Keys & Providers (includes OpenRouter)">
         <div className="form-grid-2">
-          {Object.keys(apiKeyForm).map((key) => (
+          {apiKeyDefs.map(({ key, label }) => (
             <div className="form-group" key={key}>
-              <label className="form-label">{key}</label>
+              <label className="form-label">{label}</label>
               <div className="act-time">Current: {apiKeys[key] || '—'}</div>
               <input
                 className="form-input"

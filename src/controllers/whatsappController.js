@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { AppError, ValidationError } = require('../utils/errors');
 const { success } = require('../utils/response');
-const { cacheGet, cacheSet, cacheDel } = require('../config/redis');
+const { cacheGet, cacheSet, cacheDel, getRedis } = require('../config/redis');
 const logger   = require('../config/logger');
 const {
   createSession, destroySession, getSessionStatus,
@@ -90,7 +90,12 @@ async function markConnectTokenUsed(jti) {
     MIN_TOKEN_USED_MARKER_TTL_SECONDS
   );
   // Keep the "used" marker longer than token lifetime to prevent replay around clock skew and near-expiry races.
-  await cacheSet(`wa_connect_token_used:${hashTokenJti(jti)}`, true, ttl);
+  const redis = getRedis();
+  const key = `wa_connect_token_used:${hashTokenJti(jti)}`;
+  const setResult = await redis.set(key, JSON.stringify(true), { NX: true, EX: ttl });
+  if (setResult !== 'OK') {
+    throw new AppError('Connect token already used', 401);
+  }
 }
 
 async function ensureConnectTokenUnused(jti) {

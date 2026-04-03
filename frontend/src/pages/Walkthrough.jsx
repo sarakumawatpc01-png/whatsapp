@@ -1,4 +1,5 @@
 import { Card } from '../components/common/Card'
+import { Link } from 'react-router-dom'
 
 const steps = [
   {
@@ -43,9 +44,9 @@ export const WalkthroughPage = () => {
         {steps.map((step) => (
           <Card key={step.title} title={step.title}>
             <div className="cc-desc" style={{ marginBottom: 10 }}>{step.description}</div>
-            <a className="btn btn-primary" href={step.route} style={{ textDecoration: 'none' }}>
+            <Link className="btn btn-primary" to={step.route} style={{ textDecoration: 'none' }}>
               Open
-            </a>
+            </Link>
           </Card>
         ))}
       </div>

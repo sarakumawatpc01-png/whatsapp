@@ -16,6 +16,7 @@ const axios = require('axios');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 const prisma = require('../config/database');
 const logger = require('../config/logger');
+const { cacheGet, cacheSet } = require('../config/redis');
 const { getSocketIO } = require('../socket/socketManager');
 const { handleIncomingMessage } = require('./messageHandler');
 const { normalizeToJid } = require('./jid');
@@ -51,12 +52,12 @@ function parseProxyList() {
   return [...new Set(list)];
 }
 
-function getProxyState(numberId) {
+function getProxyState(numberId, currentChoice = null) {
   const proxies = parseProxyList();
   const state = { proxies, selectedProxy: null, selectedProxyIndex: -1 };
   if (!proxies.length) return state;
 
-  const hints = [numberId, process.env.WA_EGRESS_PROXY_DEFAULT || '', process.env.WA_EGRESS_PROXY_URL || ''];
+  const hints = [currentChoice, process.env.WA_EGRESS_PROXY_DEFAULT || '', process.env.WA_EGRESS_PROXY_URL || ''];
   for (const hint of hints) {
     const idx = proxies.findIndex((url) => url === hint);
     if (idx >= 0) {
@@ -73,20 +74,13 @@ function getProxyState(numberId) {
 
 async function persistProxyChoice(numberId, proxyUrl) {
   if (!proxyUrl) return;
-  await prisma.tenantNumber.update({
-    where: { id: numberId },
-    data: { sessionFilePath: proxyUrl },
-  }).catch(() => {});
+  await cacheSet(`wa_proxy_choice:${numberId}`, proxyUrl, 60 * 60 * 24 * 30).catch(() => {});
 }
 
 async function rotateProxy(numberId) {
   const proxies = parseProxyList();
   if (!proxies.length) return null;
-  const row = await prisma.tenantNumber.findUnique({
-    where: { id: numberId },
-    select: { sessionFilePath: true },
-  });
-  const current = row?.sessionFilePath || null;
+  const current = await cacheGet(`wa_proxy_choice:${numberId}`);
   const currentIndex = proxies.findIndex((url) => url === current);
   const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % proxies.length : 0;
   const nextProxy = proxies[nextIndex];
@@ -258,7 +252,8 @@ async function createSession(numberId, tenantId, phoneLabel) {
   logger.info(`Creating WA session for number: ${numberId} (tenant: ${tenantId})`);
 
   const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
-  const proxyState = getProxyState(numberId);
+  const currentProxyChoice = await cacheGet(`wa_proxy_choice:${numberId}`).catch(() => null);
+  const proxyState = getProxyState(numberId, currentProxyChoice);
   const socketConfig = {
     auth: state,
     logger: pino({ level: process.env.BAILEYS_LOG_LEVEL || 'error' }),
@@ -369,6 +364,10 @@ async function createSession(numberId, tenantId, phoneLabel) {
           });
         }, Number(process.env.WA_RECONNECT_DELAY_MS || 3000));
         reconnectTimers.set(numberId, timer);
+      } else if (failure.blockedByIp && proxyState.proxies.length <= 1) {
+        logger.error(
+          `WA blocked for ${numberId} and no proxy fallback available. Configure WA_EGRESS_PROXY_URLS with multiple clean egress proxies.`
+        );
       }
     }
   });
