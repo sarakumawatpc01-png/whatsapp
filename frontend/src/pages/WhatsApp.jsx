@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { Card } from '../components/common/Card'
 
+const QR_POLLING_INTERVAL_MS = 2500
+
 export const WhatsAppPage = () => {
   const { api } = useAuth()
   const [numbers, setNumbers] = useState([])
@@ -38,7 +40,7 @@ export const WhatsAppPage = () => {
     }
   }
 
-  const showQr = async (id) => {
+  const showQr = useCallback(async (id) => {
     setSelectedNumberId(id)
     try {
       const res = await api.get(`/whatsapp/${id}/qr`)
@@ -51,15 +53,15 @@ export const WhatsAppPage = () => {
     } catch (err) {
       setError(err.response?.data?.error || 'QR fetch failed')
     }
-  }
+  }, [api])
 
   useEffect(() => {
     if (!selectedNumberId || !pollingQr) return undefined
     const timer = setInterval(() => {
       showQr(selectedNumberId)
-    }, 2500)
+    }, QR_POLLING_INTERVAL_MS)
     return () => clearInterval(timer)
-  }, [selectedNumberId, pollingQr])
+  }, [selectedNumberId, pollingQr, showQr])
 
   const disconnect = (id) => api.post(`/whatsapp/${id}/disconnect`).then(load)
   const reconnect = (id) => api.post(`/whatsapp/${id}/reconnect`).then(load)

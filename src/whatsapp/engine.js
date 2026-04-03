@@ -50,14 +50,14 @@ function parseProxyList() {
     .split(',')
     .map((entry) => entry.trim())
     .filter(Boolean);
-  const fallbackSingle = [
+  const fallbackProxies = [
     process.env.WA_EGRESS_PROXY_DEFAULT || '',
     process.env.WA_EGRESS_PROXY_URL || '',
   ]
     .map((entry) => entry.trim())
     .filter(Boolean);
 
-  return [...new Set([...list, ...fallbackSingle])];
+  return [...new Set([...list, ...fallbackProxies])];
 }
 
 function getProxyState(numberId, currentChoice = null) {
@@ -262,6 +262,7 @@ async function createSession(numberId, tenantId, phoneLabel) {
   const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
   const currentProxyChoice = await cacheGet(`wa_proxy_choice:${numberId}`).catch(() => null);
   const proxyState = getProxyState(numberId, currentProxyChoice);
+  const browserVersion = String(process.env.WA_BROWSER_VERSION || '122.0.0.0').trim();
   const socketConfig = {
     auth: state,
     logger: pino({ level: process.env.BAILEYS_LOG_LEVEL || 'error' }),
@@ -272,7 +273,7 @@ async function createSession(numberId, tenantId, phoneLabel) {
     keepAliveIntervalMs: Number(process.env.WA_KEEPALIVE_MS || 20_000),
     emitOwnEvents: false,
     syncFullHistory: false,
-    browser: ['Ubuntu', 'Chrome', '120.0.0.0'],
+    browser: ['Ubuntu', 'Chrome', browserVersion],
   };
   if (proxyState.selectedProxy) {
     socketConfig.fetchAgent = new HttpsProxyAgent(proxyState.selectedProxy);

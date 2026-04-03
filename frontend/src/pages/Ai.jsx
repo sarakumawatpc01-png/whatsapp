@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { Card } from '../components/common/Card'
 
@@ -9,12 +9,27 @@ export const AiPage = () => {
   const [testPrompt, setTestPrompt] = useState('')
   const [testResponse, setTestResponse] = useState('')
   const [error, setError] = useState('')
+  const [promptForm, setPromptForm] = useState({
+    businessType: '',
+    targetAudience: '',
+    tone: '',
+    responseStyle: '',
+    dos: '',
+    donts: '',
+    fallbackRule: '',
+  })
 
   const load = useCallback(async () => {
     try {
       const [cfg, documents] = await Promise.all([api.get('/ai/config'), api.get('/ai/docs')])
-      setConfig(cfg.data?.data || cfg.data)
-      setDocs(documents.data?.data || documents.data || [])
+      const configPayload = cfg.data?.data?.config || cfg.data?.data || cfg.data
+      const docsPayload = documents.data?.data?.docs || documents.data?.data || documents.data || []
+      setConfig(configPayload)
+      setDocs(Array.isArray(docsPayload) ? docsPayload : [])
+      setPromptForm((prev) => ({
+        ...prev,
+        tone: configPayload?.tone || prev.tone,
+      }))
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load AI settings')
     }
@@ -38,7 +53,7 @@ export const AiPage = () => {
     const file = e.target.files?.[0]
     if (!file) return
     const form = new FormData()
-    form.append('file', file)
+    form.append('document', file)
     try {
       await api.post('/ai/docs', form, { headers: { 'Content-Type': 'multipart/form-data' } })
       load()
@@ -58,11 +73,33 @@ export const AiPage = () => {
 
   const testAi = async () => {
     try {
-      const res = await api.post('/ai/test', { prompt: testPrompt })
+      const res = await api.post('/ai/test', { message: testPrompt })
       setTestResponse(res.data?.data?.reply || res.data?.reply || JSON.stringify(res.data))
     } catch (err) {
       setError(err.response?.data?.error || 'Test failed')
     }
+  }
+
+  const generatedPrompt = useMemo(() => {
+    const lines = [
+      `Business Type: ${promptForm.businessType || 'Not provided'}`,
+      `Target Audience: ${promptForm.targetAudience || 'General customers'}`,
+      `Preferred Tone: ${promptForm.tone || 'friendly'}`,
+      `Response Style: ${promptForm.responseStyle || 'concise and practical'}`,
+    ]
+    if (promptForm.dos) lines.push(`Must do: ${promptForm.dos}`)
+    if (promptForm.donts) lines.push(`Must avoid: ${promptForm.donts}`)
+    if (promptForm.fallbackRule) lines.push(`Fallback rule: ${promptForm.fallbackRule}`)
+    return lines.join('\n')
+  }, [promptForm])
+
+  const applyGeneratedPrompt = () => {
+    setConfig((prev) => ({
+      ...prev,
+      customInstructions: generatedPrompt,
+      tone: promptForm.tone || prev?.tone || 'friendly',
+      businessDescription: promptForm.businessType || prev?.businessDescription || '',
+    }))
   }
 
   if (!config) {
@@ -131,6 +168,82 @@ export const AiPage = () => {
           </form>
         </Card>
 
+        <Card title="Guided Prompt Builder">
+          <div className="section-sub" style={{ marginBottom: 10 }}>
+            Fill this form and generate a custom prompt automatically.
+          </div>
+          <div className="form-group">
+            <label className="form-label">Business Type</label>
+            <input
+              className="form-input"
+              value={promptForm.businessType}
+              onChange={(e) => setPromptForm((p) => ({ ...p, businessType: e.target.value }))}
+              placeholder="e.g. Dental clinic / Furniture store"
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Target Audience</label>
+            <input
+              className="form-input"
+              value={promptForm.targetAudience}
+              onChange={(e) => setPromptForm((p) => ({ ...p, targetAudience: e.target.value }))}
+              placeholder="e.g. Parents in Mumbai"
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Tone</label>
+            <input
+              className="form-input"
+              value={promptForm.tone}
+              onChange={(e) => setPromptForm((p) => ({ ...p, tone: e.target.value }))}
+              placeholder="friendly / premium / formal"
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Response Style</label>
+            <input
+              className="form-input"
+              value={promptForm.responseStyle}
+              onChange={(e) => setPromptForm((p) => ({ ...p, responseStyle: e.target.value }))}
+              placeholder="short bullets / short paragraphs"
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Must Do</label>
+            <textarea
+              className="form-input"
+              rows={2}
+              value={promptForm.dos}
+              onChange={(e) => setPromptForm((p) => ({ ...p, dos: e.target.value }))}
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Must Avoid</label>
+            <textarea
+              className="form-input"
+              rows={2}
+              value={promptForm.donts}
+              onChange={(e) => setPromptForm((p) => ({ ...p, donts: e.target.value }))}
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Fallback Rule</label>
+            <input
+              className="form-input"
+              value={promptForm.fallbackRule}
+              onChange={(e) => setPromptForm((p) => ({ ...p, fallbackRule: e.target.value }))}
+              placeholder="If unsure, ask for contact details and escalate"
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Generated Prompt Preview</label>
+            <textarea className="form-input" rows={6} value={generatedPrompt} readOnly />
+          </div>
+          <button className="btn btn-primary" onClick={applyGeneratedPrompt}>
+            Use this prompt in AI configuration
+          </button>
+        </Card>
+
         <Card title="Knowledge docs">
           <div className="status-actions">
             <label className="btn btn-ghost" style={{ cursor: 'pointer' }}>
@@ -141,7 +254,7 @@ export const AiPage = () => {
           <div style={{ marginTop: 10 }}>
             {docs.map((d) => (
               <div className="status-actions" key={d.id}>
-                <div>{d.filename}</div>
+                <div>{d.originalName || d.filename}</div>
                 <button className="btn btn-danger" onClick={() => deleteDoc(d.id)}>
                   Delete
                 </button>
