@@ -18,6 +18,7 @@ import { WhatsAppPage } from './pages/WhatsApp'
 import { SuperadminPage } from './pages/Superadmin'
 import { AffiliatePage } from './pages/Affiliate'
 import { WalkthroughPage } from './pages/Walkthrough'
+import { HarmoniumPage } from './pages/Harmonium'
 
 const Protected = ({ roles, children }) => {
   const { tokens, role } = useAuth()
@@ -59,6 +60,7 @@ function App() {
         <Route path="/channels" element={<ChannelsPage />} />
         <Route path="/groups" element={<GroupsPage />} />
         <Route path="/whatsapp" element={<WhatsAppPage />} />
+        <Route path="/harmonium" element={<HarmoniumPage />} />
       </Route>
 
       <Route

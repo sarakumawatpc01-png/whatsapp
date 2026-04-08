@@ -17,6 +17,7 @@ const navItems = [
   { path: '/status', label: 'Status Posts', icon: '📰' },
   { path: '/channels', label: 'Channels', icon: '📢' },
   { path: '/groups', label: 'Groups', icon: '👪' },
+  { path: '/harmonium', label: 'Harmonium', icon: '🎹' },
 ]
 
 export const Sidebar = ({ onNavigate }) => {
